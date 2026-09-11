@@ -3,13 +3,21 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '../types';
 import { dbService, initializeDatabase } from '../lib/db';
+import { supabase } from '../lib/supabase';
 
 interface AuthContextType {
   currentUser: User | null;
   users: User[];
-  login: (email: string) => boolean;
-  signup: (name: string, email: string, branch: string, batch: string, bio?: string) => User;
-  logout: () => void;
+  login: (email: string, password: string) => Promise<boolean>;
+  signup: (
+    name: string,
+    email: string,
+    password: string,
+    branch: string,
+    batch: string,
+    bio?: string
+  ) => Promise<User | null>;
+  logout: () => Promise<void>;
   switchDemoUser: (userId: string) => void;
   updateProfile: (data: Partial<User>) => void;
   isLoading: boolean;
@@ -22,45 +30,105 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const reloadAuth = () => {
-    initializeDatabase();
-    const allUsers = dbService.getUsers();
-    setUsers(allUsers);
-    const currentId = dbService.getCurrentUserId();
-    const user = allUsers.find((u) => u.id === currentId) || allUsers[0] || null;
-    setCurrentUser(user);
-    setIsLoading(false);
+  const loadProfile = async (userId: string): Promise<User | null> => {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (error || !data) {
+      console.error('Could not load user profile:', error);
+      return null;
+    }
+
+    return data as User;
   };
 
   useEffect(() => {
-    reloadAuth();
+    initializeDatabase();
 
-    const handleDbChange = () => {
-      const allUsers = dbService.getUsers();
-      setUsers(allUsers);
-      const currentId = dbService.getCurrentUserId();
-      const user = allUsers.find((u) => u.id === currentId) || null;
-      setCurrentUser(user);
+    const loadSession = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (session?.user) {
+        const profile = await loadProfile(session.user.id);
+
+        if (profile) {
+          setCurrentUser(profile);
+          setUsers([profile]);
+        }
+      }
+
+      setIsLoading(false);
     };
 
-    window.addEventListener('passon_db_change', handleDbChange);
-    return () => window.removeEventListener('passon_db_change', handleDbChange);
+    loadSession();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.user) {
+        const profile = await loadProfile(session.user.id);
+
+        if (profile) {
+          setCurrentUser(profile);
+          setUsers([profile]);
+        }
+      } else {
+        setCurrentUser(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const login = (email: string): boolean => {
-    const allUsers = dbService.getUsers();
-    const user = allUsers.find((u) => u.email.toLowerCase() === email.toLowerCase());
-    if (user) {
-      dbService.setCurrentUserId(user.id);
-      setCurrentUser(user);
-      return true;
+  const login = async (email: string, password: string): Promise<boolean> => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error || !data.user) {
+      console.error('Login error:', error);
+      return false;
     }
-    return false;
+
+    const profile = await loadProfile(data.user.id);
+
+    if (!profile) {
+      await supabase.auth.signOut();
+      return false;
+    }
+
+    setCurrentUser(profile);
+    setUsers([profile]);
+
+    return true;
   };
 
-  const signup = (name: string, email: string, branch: string, batch: string, bio?: string): User => {
+  const signup = async (
+    name: string,
+    email: string,
+    password: string,
+    branch: string,
+    batch: string,
+    bio?: string
+  ): Promise<User | null> => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+
+    if (error || !data.user) {
+      console.error('Signup error:', error);
+      return null;
+    }
+
     const newUser: User = {
-      id: `user-${Date.now()}`,
+      id: data.user.id,
       name,
       email,
       branch,
@@ -70,26 +138,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       role: 'student',
       created_at: new Date().toISOString(),
     };
-    const currentUsers = dbService.getUsers();
-    const updated = [newUser, ...currentUsers];
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('passon_users', JSON.stringify(updated));
+
+    const { error: profileError } = await supabase
+      .from('users')
+      .insert(newUser);
+
+    if (profileError) {
+      console.error('Profile creation error:', profileError);
+      return null;
     }
-    dbService.setCurrentUserId(newUser.id);
+
     setCurrentUser(newUser);
-    setUsers(updated);
+    setUsers([newUser]);
+
     return newUser;
   };
 
-  const logout = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('passon_current_user_id');
-    }
+  const logout = async () => {
+    await supabase.auth.signOut();
     setCurrentUser(null);
+    setUsers([]);
   };
 
   const switchDemoUser = (userId: string) => {
-    dbService.setCurrentUserId(userId);
     const allUsers = dbService.getUsers();
     const target = allUsers.find((u) => u.id === userId) || null;
     setCurrentUser(target);
@@ -97,6 +168,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateProfile = (data: Partial<User>) => {
     if (!currentUser) return;
+
     const updated = dbService.updateProfile(currentUser.id, data);
     setCurrentUser(updated);
   };
@@ -121,8 +193,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
+
   if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
+
   return context;
 };
