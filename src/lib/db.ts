@@ -18,7 +18,7 @@ const STORAGE_KEYS = {
   REPORTS: 'passon_reports',
   NOTIFICATIONS: 'passon_notifications',
   CURRENT_USER: 'passon_current_user_id',
-  VERSION: 'passon_db_v3',
+  VERSION: 'passon_db_v4',
 };
 
 // Helper for safe localStorage access
@@ -43,33 +43,33 @@ function setStored<T>(key: string, value: T): void {
   }
 }
 
-// Initializer to ensure clean practical data exists on first run
+// Initializer to ensure clean database state exists on first run
 export function initializeDatabase() {
   if (typeof window === 'undefined') return;
 
   const currentVersion = localStorage.getItem(STORAGE_KEYS.VERSION);
-  if (!currentVersion || currentVersion !== '3.0') {
+  if (!currentVersion || currentVersion !== '4.0') {
     localStorage.clear();
-    localStorage.setItem(STORAGE_KEYS.VERSION, '3.0');
+    localStorage.setItem(STORAGE_KEYS.VERSION, '4.0');
   }
 
   if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
-    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(MOCK_USERS));
+    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify([]));
   }
   if (!localStorage.getItem(STORAGE_KEYS.LISTINGS)) {
-    localStorage.setItem(STORAGE_KEYS.LISTINGS, JSON.stringify(MOCK_LISTINGS));
+    localStorage.setItem(STORAGE_KEYS.LISTINGS, JSON.stringify([]));
   }
   if (!localStorage.getItem(STORAGE_KEYS.LOOKING_FOR)) {
-    localStorage.setItem(STORAGE_KEYS.LOOKING_FOR, JSON.stringify(MOCK_LOOKING_FOR));
+    localStorage.setItem(STORAGE_KEYS.LOOKING_FOR, JSON.stringify([]));
   }
   if (!localStorage.getItem(STORAGE_KEYS.KNOWLEDGE)) {
-    localStorage.setItem(STORAGE_KEYS.KNOWLEDGE, JSON.stringify(MOCK_KNOWLEDGE_POSTS));
+    localStorage.setItem(STORAGE_KEYS.KNOWLEDGE, JSON.stringify([]));
   }
   if (!localStorage.getItem(STORAGE_KEYS.INTERESTS)) {
-    localStorage.setItem(STORAGE_KEYS.INTERESTS, JSON.stringify(MOCK_INTERESTS));
+    localStorage.setItem(STORAGE_KEYS.INTERESTS, JSON.stringify([]));
   }
   if (!localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS)) {
-    localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(MOCK_NOTIFICATIONS));
+    localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify([]));
   }
   if (!localStorage.getItem(STORAGE_KEYS.HANDOVERS)) {
     localStorage.setItem(STORAGE_KEYS.HANDOVERS, JSON.stringify([]));
@@ -87,18 +87,18 @@ export function initializeDatabase() {
     localStorage.setItem(STORAGE_KEYS.REPORTS, JSON.stringify([]));
   }
   if (!localStorage.getItem(STORAGE_KEYS.CURRENT_USER)) {
-    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify('user-rahul'));
+    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(''));
   }
 }
 
 export const dbService = {
   // USERS
-  getUsers: (): User[] => getStored(STORAGE_KEYS.USERS, MOCK_USERS),
+  getUsers: (): User[] => getStored(STORAGE_KEYS.USERS, []),
   getUserById: (id: string): User | undefined => {
     const users = dbService.getUsers();
     return users.find((u) => u.id === id);
   },
-  getCurrentUserId: (): string => getStored(STORAGE_KEYS.CURRENT_USER, 'user-rahul'),
+  getCurrentUserId: (): string => getStored(STORAGE_KEYS.CURRENT_USER, ''),
   setCurrentUserId: (id: string) => setStored(STORAGE_KEYS.CURRENT_USER, id),
   updateProfile: (userId: string, data: Partial<User>): User => {
     const users = dbService.getUsers();
@@ -112,7 +112,7 @@ export const dbService = {
 
   // LISTINGS
   getListings: (): Listing[] => {
-    const listings = getStored<Listing[]>(STORAGE_KEYS.LISTINGS, MOCK_LISTINGS);
+    const listings = getStored<Listing[]>(STORAGE_KEYS.LISTINGS, []);
     const users = dbService.getUsers();
     return listings.map((l) => ({
       ...l,
@@ -124,7 +124,7 @@ export const dbService = {
     return listings.find((l) => l.id === id);
   },
   createListing: (newListing: Omit<Listing, 'id' | 'created_at' | 'updated_at' | 'status'>): Listing => {
-    const listings = getStored<Listing[]>(STORAGE_KEYS.LISTINGS, MOCK_LISTINGS);
+    const listings = getStored<Listing[]>(STORAGE_KEYS.LISTINGS, []);
     const listing: Listing = {
       ...newListing,
       id: `listing-${Date.now()}`,
@@ -137,7 +137,7 @@ export const dbService = {
     return listing;
   },
   updateListingStatus: (id: string, status: Listing['status']): Listing => {
-    const listings = getStored<Listing[]>(STORAGE_KEYS.LISTINGS, MOCK_LISTINGS);
+    const listings = getStored<Listing[]>(STORAGE_KEYS.LISTINGS, []);
     const index = listings.findIndex((l) => l.id === id);
     if (index === -1) throw new Error('Listing not found');
     listings[index].status = status;
@@ -146,14 +146,14 @@ export const dbService = {
     return listings[index];
   },
   deleteListing: (id: string) => {
-    const listings = getStored<Listing[]>(STORAGE_KEYS.LISTINGS, MOCK_LISTINGS);
+    const listings = getStored<Listing[]>(STORAGE_KEYS.LISTINGS, []);
     const filtered = listings.filter((l) => l.id !== id);
     setStored(STORAGE_KEYS.LISTINGS, filtered);
   },
 
   // INTERESTS
   getInterests: (): Interest[] => {
-    const interests = getStored<Interest[]>(STORAGE_KEYS.INTERESTS, MOCK_INTERESTS);
+    const interests = getStored<Interest[]>(STORAGE_KEYS.INTERESTS, []);
     const listings = dbService.getListings();
     const users = dbService.getUsers();
     return interests.map((i) => ({
@@ -163,7 +163,7 @@ export const dbService = {
     }));
   },
   createInterest: (listing_id: string, student_id: string, message?: string): Interest => {
-    const interests = getStored<Interest[]>(STORAGE_KEYS.INTERESTS, MOCK_INTERESTS);
+    const interests = getStored<Interest[]>(STORAGE_KEYS.INTERESTS, []);
     const existing = interests.find((i) => i.listing_id === listing_id && i.student_id === student_id);
     if (existing) return existing;
 
@@ -198,7 +198,7 @@ export const dbService = {
     return interest;
   },
   updateInterestStatus: (id: string, status: 'ACCEPTED' | 'DECLINED'): Interest => {
-    const interests = getStored<Interest[]>(STORAGE_KEYS.INTERESTS, MOCK_INTERESTS);
+    const interests = getStored<Interest[]>(STORAGE_KEYS.INTERESTS, []);
     const index = interests.findIndex((i) => i.id === id);
     if (index === -1) throw new Error('Interest not found');
 
@@ -290,7 +290,7 @@ export const dbService = {
 
   // LOOKING FOR
   getLookingFor: (): LookingFor[] => {
-    const requests = getStored<LookingFor[]>(STORAGE_KEYS.LOOKING_FOR, MOCK_LOOKING_FOR);
+    const requests = getStored<LookingFor[]>(STORAGE_KEYS.LOOKING_FOR, []);
     const users = dbService.getUsers();
     return requests.map((r) => ({
       ...r,
@@ -298,7 +298,7 @@ export const dbService = {
     }));
   },
   createLookingFor: (newReq: Omit<LookingFor, 'id' | 'created_at' | 'updated_at' | 'status'>): LookingFor => {
-    const requests = getStored<LookingFor[]>(STORAGE_KEYS.LOOKING_FOR, MOCK_LOOKING_FOR);
+    const requests = getStored<LookingFor[]>(STORAGE_KEYS.LOOKING_FOR, []);
     const req: LookingFor = {
       ...newReq,
       id: `req-${Date.now()}`,
@@ -310,7 +310,7 @@ export const dbService = {
     return req;
   },
   updateLookingForStatus: (id: string, status: LookingFor['status']): LookingFor => {
-    const requests = getStored<LookingFor[]>(STORAGE_KEYS.LOOKING_FOR, MOCK_LOOKING_FOR);
+    const requests = getStored<LookingFor[]>(STORAGE_KEYS.LOOKING_FOR, []);
     const index = requests.findIndex((r) => r.id === id);
     if (index === -1) throw new Error('Request not found');
     requests[index].status = status;
@@ -328,7 +328,7 @@ export const dbService = {
 
   // KNOWLEDGE POSTS
   getKnowledgePosts: (): KnowledgePost[] => {
-    const posts = getStored<KnowledgePost[]>(STORAGE_KEYS.KNOWLEDGE, MOCK_KNOWLEDGE_POSTS);
+    const posts = getStored<KnowledgePost[]>(STORAGE_KEYS.KNOWLEDGE, []);
     const users = dbService.getUsers();
     return posts.map((p) => ({
       ...p,
@@ -340,7 +340,7 @@ export const dbService = {
     return posts.find((p) => p.id === id);
   },
   createKnowledgePost: (newPost: Omit<KnowledgePost, 'id' | 'created_at' | 'updated_at' | 'status' | 'useful_count'>): KnowledgePost => {
-    const posts = getStored<KnowledgePost[]>(STORAGE_KEYS.KNOWLEDGE, MOCK_KNOWLEDGE_POSTS);
+    const posts = getStored<KnowledgePost[]>(STORAGE_KEYS.KNOWLEDGE, []);
     const post: KnowledgePost = {
       ...newPost,
       id: `post-${Date.now()}`,
@@ -353,7 +353,7 @@ export const dbService = {
     return post;
   },
   incrementUsefulCount: (id: string): number => {
-    const posts = getStored<KnowledgePost[]>(STORAGE_KEYS.KNOWLEDGE, MOCK_KNOWLEDGE_POSTS);
+    const posts = getStored<KnowledgePost[]>(STORAGE_KEYS.KNOWLEDGE, []);
     const index = posts.findIndex((p) => p.id === id);
     if (index === -1) return 0;
     posts[index].useful_count += 1;
@@ -475,11 +475,11 @@ export const dbService = {
 
   // NOTIFICATIONS
   getNotifications: (userId: string): Notification[] => {
-    const notifs = getStored<Notification[]>(STORAGE_KEYS.NOTIFICATIONS, MOCK_NOTIFICATIONS);
+    const notifs = getStored<Notification[]>(STORAGE_KEYS.NOTIFICATIONS, []);
     return notifs.filter((n) => n.user_id === userId);
   },
   createNotification: (user_id: string, type: Notification['type'], message: string, link?: string): Notification => {
-    const notifs = getStored<Notification[]>(STORAGE_KEYS.NOTIFICATIONS, MOCK_NOTIFICATIONS);
+    const notifs = getStored<Notification[]>(STORAGE_KEYS.NOTIFICATIONS, []);
     const notif: Notification = {
       id: `notif-${Date.now()}`,
       user_id,
@@ -493,7 +493,7 @@ export const dbService = {
     return notif;
   },
   markNotificationRead: (id: string): void => {
-    const notifs = getStored<Notification[]>(STORAGE_KEYS.NOTIFICATIONS, MOCK_NOTIFICATIONS);
+    const notifs = getStored<Notification[]>(STORAGE_KEYS.NOTIFICATIONS, []);
     const index = notifs.findIndex((n) => n.id === id);
     if (index !== -1) {
       notifs[index].read = true;
@@ -501,7 +501,7 @@ export const dbService = {
     }
   },
   markAllNotificationsRead: (userId: string): void => {
-    const notifs = getStored<Notification[]>(STORAGE_KEYS.NOTIFICATIONS, MOCK_NOTIFICATIONS);
+    const notifs = getStored<Notification[]>(STORAGE_KEYS.NOTIFICATIONS, []);
     notifs.forEach((n) => {
       if (n.user_id === userId) n.read = true;
     });

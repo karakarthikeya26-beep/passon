@@ -8,7 +8,13 @@ export const Footer: React.FC = () => {
     <footer className="bg-[#FAF9F6] border-t border-[#E7E5E4] text-[#78716C] py-12 px-4 sm:px-6 lg:px-8 mt-20">
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-8">
         <div className="space-y-3 md:col-span-2">
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-3">
+            <img
+              src="/favicon.ico"
+              alt="VNR VJIET Logo"
+              className="w-7 h-7 object-contain"
+            />
+            <div className="h-5 w-[1px] bg-stone-300" />
             <div className="w-8 h-8 rounded-xl bg-[#E9784B] flex items-center justify-center text-white font-black text-lg shadow-sm">
               P
             </div>

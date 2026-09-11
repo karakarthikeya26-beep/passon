@@ -218,11 +218,25 @@ export default function HomePage() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {recentKnowledge.map((post) => (
-            <KnowledgeCard key={post.id} post={post} />
-          ))}
-        </div>
+        {recentKnowledge.length === 0 ? (
+          <div className="bg-white border border-[#E7E5E4] rounded-3xl p-10 text-center space-y-2 shadow-xs">
+            <BookOpen className="w-10 h-10 text-stone-400 mx-auto" />
+            <p className="text-sm font-bold text-[#292524]">No knowledge posts yet.</p>
+            <p className="text-xs text-stone-500 font-medium">Share something useful with the VNR community.</p>
+            <Link
+              href="/knowledge/new"
+              className="inline-block mt-3 bg-[#E9784B] hover:bg-[#d8673a] text-white font-bold text-xs px-4 py-2 rounded-xl transition-all shadow-xs"
+            >
+              Share Knowledge
+            </Link>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {recentKnowledge.map((post) => (
+              <KnowledgeCard key={post.id} post={post} />
+            ))}
+          </div>
+        )}
       </section>
 
       {/* How PassOn Works Section */}

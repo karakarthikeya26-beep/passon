@@ -20,9 +20,7 @@ export default function CreateListingPage() {
   const [price, setPrice] = useState<number>(500);
   const [exchangePreference, setExchangePreference] = useState('');
   const [description, setDescription] = useState('');
-  const [images, setImages] = useState<string[]>([
-    'https://images.unsplash.com/photo-1611125832047-1d7ad1e8e48b?w=800'
-  ]);
+  const [images, setImages] = useState<string[]>([]);
   const [newImageUrl, setNewImageUrl] = useState('');
 
   const categories: Category[] = [
@@ -40,11 +38,9 @@ export default function CreateListingPage() {
   const modes: ExchangeMode[] = ['Sell', 'Exchange', 'Donate', 'Hand Over'];
 
   const sampleImagePresets = [
-    'https://images.unsplash.com/photo-1611125832047-1d7ad1e8e48b?w=800', // Calculator
-    'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=800', // Books
-    'https://images.unsplash.com/photo-1553406830-ef2513450d76?w=800', // Arduino
-    'https://images.unsplash.com/photo-1584820927498-cfe5211fd8bf?w=800', // Lab coat
-    'https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=800', // Laptop stand
+    'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=800', // Study & Reference Material
+    'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800', // Academic Gear
+    'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800', // Engineering Equipment
   ];
 
   const handleAddPresetImage = (url: string) => {

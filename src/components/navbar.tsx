@@ -58,16 +58,22 @@ export const Navbar: React.FC = () => {
           
           {/* Logo & Tagline */}
           <div className="flex items-center gap-6">
-            <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="w-9 h-9 rounded-xl bg-[#E9784B] flex items-center justify-center text-white font-black text-lg shadow-sm group-hover:scale-105 transition-transform">
+            <Link href="/" className="flex items-center gap-3 group">
+              <img
+                src="/favicon.ico"
+                alt="VNR VJIET Logo"
+                className="w-8 h-8 sm:w-9 sm:h-9 object-contain group-hover:scale-105 transition-transform"
+              />
+              <div className="h-7 w-[1px] bg-stone-200" />
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#E9784B] flex items-center justify-center text-white font-black text-lg shadow-sm group-hover:scale-105 transition-transform">
                 P
               </div>
               <div className="flex flex-col">
-                <span className="font-extrabold text-lg tracking-tight text-[#292524] group-hover:text-[#E9784B] transition-colors">
+                <span className="font-extrabold text-base sm:text-lg tracking-tight text-[#292524] group-hover:text-[#E9784B] transition-colors leading-tight">
                   PassOn
                 </span>
-                <span className="text-[10px] font-semibold text-[#E9784B] tracking-wide uppercase">
-                  VNR Student Exchange
+                <span className="text-[9px] sm:text-[10px] font-bold text-[#E9784B] tracking-wider uppercase leading-none mt-0.5">
+                  VNR VJIET Community
                 </span>
               </div>
             </Link>

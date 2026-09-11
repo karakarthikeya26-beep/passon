@@ -98,15 +98,15 @@ export default function KnowledgeShelfPage() {
       {filteredPosts.length === 0 ? (
         <div className="bg-white border border-stone-200/80 rounded-3xl p-16 text-center space-y-3 shadow-sm">
           <BookOpen className="w-12 h-12 text-stone-400 mx-auto" />
-          <h3 className="text-base font-bold text-stone-800">Knowledge Shelf is waiting for the next great tip.</h3>
+          <h3 className="text-base font-bold text-stone-800">No knowledge posts yet</h3>
           <p className="text-xs text-stone-500 max-w-sm mx-auto">
-            No posts found for this category or search term.
+            Share something useful with the VNR community.
           </p>
           <Link
             href="/knowledge/new"
             className="inline-block mt-2 bg-[#E9784B] hover:bg-[#d66538] text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-sm transition-all"
           >
-            Be the first to share guidance
+            Share Knowledge
           </Link>
         </div>
       ) : (

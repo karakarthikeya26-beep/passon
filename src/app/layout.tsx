@@ -9,6 +9,11 @@ import { ToastContainer } from '../components/ui/toast-container';
 export const metadata: Metadata = {
   title: 'PassOn — VNR Student Exchange & Knowledge Platform',
   description: 'PassOn helps VNR VJIET students discover, exchange, donate, hand over useful items and share practical senior knowledge. Pass it forward.',
+  icons: {
+    icon: '/favicon.ico',
+    shortcut: '/favicon.ico',
+    apple: '/favicon.ico',
+  },
 };
 
 export default function RootLayout({
@@ -19,6 +24,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
