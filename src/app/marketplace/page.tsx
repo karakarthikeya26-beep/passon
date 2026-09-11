@@ -185,15 +185,15 @@ function MarketplaceContent() {
         {sortedListings.length === 0 ? (
           <div className="bg-white border border-[#E7E5E4] rounded-3xl p-16 text-center space-y-3 shadow-xs">
             <Package className="w-12 h-12 text-stone-400 mx-auto" />
-            <h3 className="text-base font-bold text-[#292524]">Nothing found here yet.</h3>
+            <h3 className="text-base font-bold text-[#292524]">No items listed yet</h3>
             <p className="text-xs text-stone-500 max-w-sm mx-auto font-medium">
-              Your next useful discovery might be just around the corner. Try adjusting your filters or post a request on Looking For.
+              Be the first to list something for the VNR community.
             </p>
             <Link
-              href="/looking-for/new"
-              className="inline-block mt-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl transition-all shadow-xs"
+              href="/listing/new"
+              className="inline-block mt-2 bg-[#E9784B] hover:bg-[#d8673a] text-white text-xs font-bold px-5 py-2.5 rounded-xl transition-all shadow-xs"
             >
-              Post a Request on Looking For
+              List Something Useful
             </Link>
           </div>
         ) : (

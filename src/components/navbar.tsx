@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
+import { getNeutralAvatarUrl } from '../lib/supabase';
 import { SearchModal } from './search-modal';
 import {
   Search, Bell, User, PlusCircle, BookOpen, SearchCode,
@@ -189,9 +190,9 @@ export const Navbar: React.FC = () => {
                   className="flex items-center gap-2 p-1.5 rounded-xl bg-stone-100/80 hover:bg-stone-200/80 border border-[#E7E5E4] transition-all text-xs text-left"
                 >
                   <img
-                    src={currentUser.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'}
+                    src={currentUser.avatar_url || getNeutralAvatarUrl(currentUser.name)}
                     alt={currentUser.name}
-                    className="w-7 h-7 rounded-full object-cover border border-[#E9784B]/40"
+                    className="w-7 h-7 rounded-full object-cover border border-[#E9784B]/40 bg-stone-100"
                   />
                   <span className="hidden md:inline font-bold text-[#292524] truncate max-w-[100px]">
                     {currentUser.name.split(' ')[0]}

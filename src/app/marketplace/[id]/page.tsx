@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useApp } from '../../../context/AppContext';
 import { useAuth } from '../../../context/AuthContext';
+import { getNeutralAvatarUrl } from '../../../lib/supabase';
 import { ListingStatusBadge } from '../../../components/listing-status-badge';
 import { InterestModal } from '../../../components/interest-modal';
 import { HandoverModal } from '../../../components/handover-modal';
@@ -166,9 +167,9 @@ export default function ListingDetailPage() {
             <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">Listed By VNR Student</div>
             <div className="flex items-center gap-3">
               <img
-                src={owner?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'}
+                src={owner?.avatar_url || getNeutralAvatarUrl(owner?.name || 'VNR Student')}
                 alt={owner?.name}
-                className="w-11 h-11 rounded-full object-cover border border-[#E9784B]/40"
+                className="w-11 h-11 rounded-full object-cover border border-[#E9784B]/40 bg-stone-100"
               />
               <div>
                 <div className="font-extrabold text-sm text-[#292524]">{owner?.name || 'VNR Student'}</div>

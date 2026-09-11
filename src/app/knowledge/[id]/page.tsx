@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useApp } from '../../../context/AppContext';
 import { useAuth } from '../../../context/AuthContext';
+import { getNeutralAvatarUrl } from '../../../lib/supabase';
 import { KnowledgeCard } from '../../../components/knowledge-card';
 import { ReportModal } from '../../../components/report-modal';
 import {
@@ -102,9 +103,9 @@ export default function KnowledgeDetailPage() {
           {/* Author Card */}
           <div className="flex items-center gap-3 pt-2">
             <img
-              src={author?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'}
+              src={author?.avatar_url || getNeutralAvatarUrl(author?.name || 'VNR Senior')}
               alt={author?.name}
-              className="w-11 h-11 rounded-full object-cover border border-[#F6C7A9]"
+              className="w-11 h-11 rounded-full object-cover border border-[#F6C7A9] bg-stone-100"
             />
             <div>
               <div className="font-bold text-sm text-stone-900 flex items-center gap-2">

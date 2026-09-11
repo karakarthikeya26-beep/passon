@@ -1,11 +1,14 @@
 export type UserRole = 'student' | 'admin';
 
+export type Gender = 'Male' | 'Female' | 'Non-binary' | 'Prefer not to say';
+
 export interface User {
   id: string;
   name: string;
   email: string;
   branch: string;
   batch: string;
+  gender?: Gender;
   avatar_url?: string;
   bio?: string;
   role: UserRole;

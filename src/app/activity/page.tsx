@@ -4,6 +4,7 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
+import { getNeutralAvatarUrl } from '../../lib/supabase';
 import { ListingCard } from '../../components/listing-card';
 import { LookingForCard } from '../../components/looking-for-card';
 import { KnowledgeCard } from '../../components/knowledge-card';
@@ -228,9 +229,9 @@ function ActivityContent() {
                     <div className="flex items-center justify-between flex-wrap gap-2">
                       <div className="flex items-center gap-3">
                         <img
-                          src={interest.student?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
+                          src={interest.student?.avatar_url || getNeutralAvatarUrl(interest.student?.name || 'Student')}
                           alt={interest.student?.name}
-                          className="w-10 h-10 rounded-full object-cover border border-[#F6C7A9]"
+                          className="w-10 h-10 rounded-full object-cover border border-[#F6C7A9] bg-stone-100"
                         />
                         <div>
                           <div className="font-bold text-sm text-stone-900">{interest.student?.name}</div>

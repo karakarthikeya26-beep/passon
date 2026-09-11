@@ -18,6 +18,7 @@ const STORAGE_KEYS = {
   REPORTS: 'passon_reports',
   NOTIFICATIONS: 'passon_notifications',
   CURRENT_USER: 'passon_current_user_id',
+  VERSION: 'passon_db_v3',
 };
 
 // Helper for safe localStorage access
@@ -42,9 +43,15 @@ function setStored<T>(key: string, value: T): void {
   }
 }
 
-// Initializer to ensure mock data exists on first run
+// Initializer to ensure clean practical data exists on first run
 export function initializeDatabase() {
   if (typeof window === 'undefined') return;
+
+  const currentVersion = localStorage.getItem(STORAGE_KEYS.VERSION);
+  if (!currentVersion || currentVersion !== '3.0') {
+    localStorage.clear();
+    localStorage.setItem(STORAGE_KEYS.VERSION, '3.0');
+  }
 
   if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(MOCK_USERS));
@@ -80,7 +87,7 @@ export function initializeDatabase() {
     localStorage.setItem(STORAGE_KEYS.REPORTS, JSON.stringify([]));
   }
   if (!localStorage.getItem(STORAGE_KEYS.CURRENT_USER)) {
-    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify('user-rahul')); // Default senior demo user
+    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify('user-rahul'));
   }
 }
 

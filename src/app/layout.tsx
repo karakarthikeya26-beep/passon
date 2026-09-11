@@ -5,7 +5,6 @@ import { AppProvider } from '../context/AppContext';
 import { Navbar } from '../components/navbar';
 import { Footer } from '../components/footer';
 import { ToastContainer } from '../components/ui/toast-container';
-import { DemoUserSwitcher } from '../components/demo-user-switcher';
 
 export const metadata: Metadata = {
   title: 'PassOn — VNR Student Exchange & Knowledge Platform',
@@ -31,7 +30,6 @@ export default function RootLayout({
             <main className="flex-1">{children}</main>
             <Footer />
             <ToastContainer />
-            <DemoUserSwitcher />
           </AppProvider>
         </AuthProvider>
       </body>

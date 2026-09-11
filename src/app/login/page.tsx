@@ -75,51 +75,7 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* Quick Demo Account Selector */}
-        <div className="pt-4 border-t border-stone-200 space-y-3">
-          <div className="text-[11px] font-bold text-stone-400 uppercase tracking-wider text-center">
-            Or Sign in with Demo Accounts:
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() => {
-                switchDemoUser('user-rahul');
-                router.push('/marketplace');
-              }}
-              className="flex items-center gap-2 bg-stone-50 hover:bg-stone-100 border border-stone-200 p-2.5 rounded-xl text-left transition-all"
-            >
-              <img
-                src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100"
-                alt="Rahul"
-                className="w-7 h-7 rounded-full object-cover shrink-0"
-              />
-              <div className="truncate">
-                <div className="text-xs font-bold text-stone-900 truncate">Rahul (Senior)</div>
-                <div className="text-[10px] text-[#E9784B]">CSE 4th Year</div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => {
-                switchDemoUser('user-ananya');
-                router.push('/marketplace');
-              }}
-              className="flex items-center gap-2 bg-stone-50 hover:bg-stone-100 border border-stone-200 p-2.5 rounded-xl text-left transition-all"
-            >
-              <img
-                src="https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100"
-                alt="Ananya"
-                className="w-7 h-7 rounded-full object-cover shrink-0"
-              />
-              <div className="truncate">
-                <div className="text-xs font-bold text-stone-900 truncate">Ananya (Junior)</div>
-                <div className="text-[10px] text-amber-600">CSE 2nd Year</div>
-              </div>
-            </button>
-          </div>
-        </div>
-
-        <div className="text-center text-xs text-stone-500 pt-2">
+        <div className="text-center text-xs text-stone-500 pt-2 border-t border-stone-200">
           Don't have an account?{' '}
           <Link href="/signup" className="text-[#E9784B] font-semibold hover:underline">
             Sign up here

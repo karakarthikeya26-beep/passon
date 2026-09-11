@@ -8,7 +8,7 @@ export const MOCK_USERS: User[] = [
     branch: 'Computer Science & Engineering',
     batch: '4th Year (2022-2026)',
     avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-    bio: '4th Year CSE student. Full-stack developer & competitive programmer. Clearing out useful gear for juniors!',
+    bio: '4th Year CSE student. Passing forward academic books and lab equipment to juniors.',
     role: 'student',
     created_at: new Date(Date.now() - 30 * 86400000).toISOString(),
   },
@@ -30,7 +30,7 @@ export const MOCK_USERS: User[] = [
     branch: 'Electrical & Electronics Engineering',
     batch: '4th Year (2022-2026)',
     avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-    bio: 'EEE 4th Year. Hardware hacker, IoT builder, and robotics enthusiast.',
+    bio: 'EEE 4th Year student. Interested in robotics and IoT project component sharing.',
     role: 'student',
     created_at: new Date(Date.now() - 25 * 86400000).toISOString(),
   },
@@ -41,7 +41,7 @@ export const MOCK_USERS: User[] = [
     branch: 'Electronics & Communication Engineering',
     batch: '3rd Year (2023-2027)',
     avatar_url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
-    bio: '3rd Year ECE. Passionate about signal processing and academic mentorship.',
+    bio: '3rd Year ECE student sharing reference books and project guidance.',
     role: 'student',
     created_at: new Date(Date.now() - 20 * 86400000).toISOString(),
   },
@@ -52,7 +52,7 @@ export const MOCK_USERS: User[] = [
     branch: 'Mechanical Engineering',
     batch: '2nd Year (2024-2028)',
     avatar_url: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80',
-    bio: 'Mechanical Eng 2nd Year. Donating unused drawing tools and workshop gear.',
+    bio: 'Mechanical Engineering 2nd Year student.',
     role: 'student',
     created_at: new Date(Date.now() - 10 * 86400000).toISOString(),
   },
@@ -63,107 +63,13 @@ export const MOCK_USERS: User[] = [
     branch: 'Campus Administration',
     batch: 'Faculty Staff',
     avatar_url: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
-    bio: 'Official PassOn Moderation & Campus Safety Coordinator.',
+    bio: 'PassOn Campus Safety & Community Moderation Team.',
     role: 'admin',
     created_at: new Date(Date.now() - 60 * 86400000).toISOString(),
   },
 ];
 
-export const MOCK_LISTINGS: Listing[] = [
-  {
-    id: 'listing-1',
-    owner_id: 'user-rahul',
-    owner: MOCK_USERS[0],
-    title: 'Casio Scientific Calculator FX-991EX',
-    category: 'Academic',
-    condition: 'Good',
-    mode: 'Exchange',
-    price: 600,
-    exchange_preference: 'Exchange for S5 CSE handbook or ₹600',
-    description: 'Fully functional Casio FX-991EX ClassWiz scientific calculator with solar dual power. Ideal for M1, M2, M3 lab calculations and engineering exams. Screen is completely scratch-free.',
-    images: [
-      'https://images.unsplash.com/photo-1611125832047-1d7ad1e8e48b?w=800&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1594980596870-8aa52a78d8cd?w=800&auto=format&fit=crop&q=80'
-    ],
-    status: 'AVAILABLE',
-    created_at: new Date(Date.now() - 2 * 86400000).toISOString(),
-    updated_at: new Date(Date.now() - 2 * 86400000).toISOString(),
-  },
-  {
-    id: 'listing-2',
-    owner_id: 'user-priya',
-    owner: MOCK_USERS[3],
-    title: 'Engineering Mathematics Reference Books (BS Grewal)',
-    category: 'Books',
-    condition: 'Good',
-    mode: 'Donate',
-    price: 0,
-    exchange_preference: 'Free for any first or second year student in need',
-    description: 'Higher Engineering Mathematics by B.S. Grewal (44th Edition). Contains highlighted key formulas and solved question papers from past VNR university exams.',
-    images: [
-      'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=800&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=800&auto=format&fit=crop&q=80'
-    ],
-    status: 'AVAILABLE',
-    created_at: new Date(Date.now() - 3 * 86400000).toISOString(),
-    updated_at: new Date(Date.now() - 3 * 86400000).toISOString(),
-  },
-  {
-    id: 'listing-3',
-    owner_id: 'user-vikram',
-    owner: MOCK_USERS[2],
-    title: 'Arduino Uno Project Starter Kit with Sensors',
-    category: 'Project',
-    condition: 'Like New',
-    mode: 'Sell',
-    price: 1200,
-    exchange_preference: 'Looking to sell or trade for Raspberry Pi Pico module',
-    description: 'Complete Arduino Uno R3 starter kit with breadboard, ultrasonic sensor HC-SR04, DHT11 temp sensor, 16x2 LCD display, servo motors, jumper wires, and Bluetooth HC-05 module. Used for major project prototyping.',
-    images: [
-      'https://images.unsplash.com/photo-1553406830-ef2513450d76?w=800&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&auto=format&fit=crop&q=80'
-    ],
-    status: 'AVAILABLE',
-    created_at: new Date(Date.now() - 1 * 86400000).toISOString(),
-    updated_at: new Date(Date.now() - 1 * 86400000).toISOString(),
-  },
-  {
-    id: 'listing-4',
-    owner_id: 'user-sneha',
-    owner: MOCK_USERS[4],
-    title: 'White College Lab Coat (Size M)',
-    category: 'Lab',
-    condition: 'Good',
-    mode: 'Hand Over',
-    price: 0,
-    exchange_preference: 'Hand over to any junior starting Chemistry/Workshop lab',
-    description: 'Clean cotton white lab coat (Size M) with VNR lab badge space. Washed and ironed, ready for Chemistry and Physics lab sessions.',
-    images: [
-      'https://images.unsplash.com/photo-1584820927498-cfe5211fd8bf?w=800&auto=format&fit=crop&q=80'
-    ],
-    status: 'AVAILABLE',
-    created_at: new Date(Date.now() - 4 * 86400000).toISOString(),
-    updated_at: new Date(Date.now() - 4 * 86400000).toISOString(),
-  },
-  {
-    id: 'listing-5',
-    owner_id: 'user-rahul',
-    owner: MOCK_USERS[0],
-    title: 'Ergonomic Aluminium Laptop Stand',
-    category: 'Electronics',
-    condition: 'Good',
-    mode: 'Sell',
-    price: 500,
-    exchange_preference: 'Cash or UPI on campus handover',
-    description: 'Foldable metal laptop riser stand with heat dissipation vents. Fits 13-16 inch laptops. Perfect for long hostel study sessions.',
-    images: [
-      'https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=800&auto=format&fit=crop&q=80'
-    ],
-    status: 'AVAILABLE',
-    created_at: new Date(Date.now() - 5 * 86400000).toISOString(),
-    updated_at: new Date(Date.now() - 5 * 86400000).toISOString(),
-  },
-];
+export const MOCK_LISTINGS: Listing[] = [];
 
 export const MOCK_LOOKING_FOR: LookingFor[] = [
   {
@@ -310,37 +216,6 @@ Start mock interviews with batchmates early in 3rd year 2nd sem. Good luck!`,
   },
 ];
 
-export const MOCK_INTERESTS: Interest[] = [
-  {
-    id: 'interest-1',
-    listing_id: 'listing-1',
-    listing: MOCK_LISTINGS[0],
-    student_id: 'user-ananya',
-    student: MOCK_USERS[1],
-    message: 'Hi Rahul! I really need this scientific calculator for my M3 exam preparation this semester.',
-    status: 'PENDING',
-    created_at: new Date(Date.now() - 1 * 86400000).toISOString(),
-    updated_at: new Date(Date.now() - 1 * 86400000).toISOString(),
-  }
-];
+export const MOCK_INTERESTS: Interest[] = [];
 
-export const MOCK_NOTIFICATIONS: Notification[] = [
-  {
-    id: 'notif-1',
-    user_id: 'user-rahul',
-    type: 'INTEREST_RECEIVED',
-    message: 'Ananya Reddy expressed interest in your Casio Scientific Calculator.',
-    link: '/activity',
-    read: false,
-    created_at: new Date(Date.now() - 1 * 86400000).toISOString(),
-  },
-  {
-    id: 'notif-2',
-    user_id: 'user-ananya',
-    type: 'NEW_MATCH',
-    message: 'PassOn found a STRONG MATCH for your calculator request: Casio FX-991EX.',
-    link: '/matches',
-    read: false,
-    created_at: new Date(Date.now() - 2 * 86400000).toISOString(),
-  }
-];
+export const MOCK_NOTIFICATIONS: Notification[] = [];

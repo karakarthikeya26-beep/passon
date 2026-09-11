@@ -15,6 +15,7 @@ export default function SignupPage() {
   const [password, setPassword] = useState('');
   const [branch, setBranch] = useState('Computer Science & Engineering');
   const [batch, setBatch] = useState('2nd Year (2024-2028)');
+  const [gender, setGender] = useState<string>('Prefer not to say');
   const [bio, setBio] = useState('');
 
   const branches = [
@@ -38,11 +39,15 @@ export default function SignupPage() {
     'Postgraduate / M.Tech',
   ];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const genders = ['Male', 'Female', 'Non-binary', 'Prefer not to say'];
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !email) return;
-    signup(name, email, branch, batch, bio);
-    router.push('/marketplace');
+    const user = await signup(name, email, password, branch, batch, gender as any, bio);
+    if (user) {
+      router.push('/marketplace');
+    }
   };
 
   return (
@@ -111,6 +116,23 @@ export default function SignupPage() {
                 ))}
               </select>
             </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-stone-700 mb-1">
+              Gender <span className="text-stone-400 font-normal">(Optional)</span>
+            </label>
+            <select
+              value={gender}
+              onChange={(e) => setGender(e.target.value)}
+              className="w-full bg-stone-50 border border-stone-200 rounded-xl p-3 text-xs text-stone-900 focus:outline-none focus:border-[#E9784B] focus:bg-white transition-colors"
+            >
+              {genders.map((g) => (
+                <option key={g} value={g}>
+                  {g}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>
