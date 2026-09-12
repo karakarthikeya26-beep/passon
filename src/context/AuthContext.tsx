@@ -20,6 +20,12 @@ export interface LoginResult {
   error?: string;
 }
 
+export interface ResetPasswordResult {
+  success: boolean;
+  message?: string;
+  error?: string;
+}
+
 interface AuthContextType {
   currentUser: User | null;
   users: User[];
@@ -33,6 +39,8 @@ interface AuthContextType {
     gender?: Gender,
     bio?: string
   ) => Promise<SignupResult>;
+  resetPasswordForEmail: (email: string) => Promise<ResetPasswordResult>;
+  updatePassword: (newPassword: string) => Promise<ResetPasswordResult>;
   logout: () => Promise<void>;
   switchDemoUser: (userId: string) => void;
   updateProfile: (data: Partial<User>) => void;
@@ -336,6 +344,87 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   };
 
+  const resetPasswordForEmail = async (email: string): Promise<ResetPasswordResult> => {
+    initializeDatabase();
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (!cleanEmail) {
+      return { success: false, error: 'Please enter your registered email address.' };
+    }
+
+    const redirectUrl = `${getURL()}auth/callback?next=/auth/reset-password`;
+    console.log('[AuthContext] resetPasswordForEmail for:', cleanEmail, '| Redirect:', redirectUrl);
+
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+          redirectTo: redirectUrl,
+        });
+
+        if (error) {
+          console.error('[AuthContext] resetPasswordForEmail error:', error.message);
+          return { success: false, error: error.message };
+        }
+
+        return {
+          success: true,
+          message: 'Password reset link sent. Please check your email.',
+        };
+      } catch (err: any) {
+        console.error('[AuthContext] resetPasswordForEmail exception:', err);
+        return {
+          success: false,
+          error: err.message || 'Could not send password reset email. Please try again.',
+        };
+      }
+    }
+
+    return {
+      success: true,
+      message: 'Password reset link sent. Please check your email.',
+    };
+  };
+
+  const updatePassword = async (newPassword: string): Promise<ResetPasswordResult> => {
+    initializeDatabase();
+
+    if (!newPassword || newPassword.length < 6) {
+      return { success: false, error: 'Password must be at least 6 characters long.' };
+    }
+
+    console.log('[AuthContext] Updating user password via Supabase...');
+
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase.auth.updateUser({
+          password: newPassword,
+        });
+
+        if (error) {
+          console.error('[AuthContext] updateUser password error:', error.message);
+          return { success: false, error: error.message };
+        }
+
+        console.log('[AuthContext] Password updated successfully for user:', data.user?.email);
+        return {
+          success: true,
+          message: 'Your password has been updated successfully.',
+        };
+      } catch (err: any) {
+        console.error('[AuthContext] updateUser password exception:', err);
+        return {
+          success: false,
+          error: err.message || 'Could not update password. Please try again.',
+        };
+      }
+    }
+
+    return {
+      success: true,
+      message: 'Your password has been updated successfully.',
+    };
+  };
+
   const logout = async () => {
     if (isSupabaseConfigured) {
       try {
@@ -372,6 +461,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         users,
         login,
         signup,
+        resetPasswordForEmail,
+        updatePassword,
         logout,
         switchDemoUser,
         updateProfile,
