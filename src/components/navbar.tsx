@@ -58,16 +58,11 @@ export const Navbar: React.FC = () => {
           
           {/* Logo & Tagline */}
           <div className="flex items-center gap-4">
-            <Link href="/" className="flex items-center gap-2.5 group shrink-0">
-              <img
-                src="/favicon.ico"
-                alt="VNR Logo"
-                className="h-8 sm:h-10 w-auto object-contain transition-transform group-hover:scale-105 shrink-0"
-              />
+            <Link href="/" className="flex items-center gap-3 group shrink-0">
               <img
                 src="/passon-logo.png"
                 alt="PassOn Logo"
-                className="h-7 sm:h-9 w-auto object-contain transition-transform group-hover:scale-105 shrink-0"
+                className="h-8 sm:h-10 w-auto object-contain transition-transform group-hover:scale-105 shrink-0"
               />
               <div className="h-8 w-[1px] bg-stone-200 hidden xs:block" />
               <div className="flex flex-col">
