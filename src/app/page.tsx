@@ -44,14 +44,14 @@ export default function HomePage() {
       {/* Hero Section */}
       <section className="relative overflow-hidden pt-12 pb-16 px-4 sm:px-6 lg:px-8 border-b border-[#E7E5E4] bg-[#FFFCF8]">
         <div className="max-w-5xl mx-auto text-center space-y-8 relative z-10">
-          <h1 className="text-4xl sm:text-6xl font-black text-[#292524] tracking-tight leading-tight uppercase flex items-center justify-center gap-3 sm:gap-4 flex-wrap">
+          <h1 className="text-4xl sm:text-6xl font-black text-[#292524] tracking-tight leading-tight flex items-center justify-center gap-3 sm:gap-4 flex-wrap">
             <img
               src="/passon-logo.png"
               alt="VNR Logo"
               className="h-10 sm:h-14 md:h-16 w-auto object-contain shrink-0"
             />
             <span>
-              PASSON<span className="text-[#E9784B]">.</span>
+              PassOn<span className="text-[#E9784B]">.</span>
             </span>
           </h1>
 
