@@ -86,9 +86,11 @@ export default function LoginPage() {
     <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
       <div className="bg-white border border-stone-200/80 rounded-3xl shadow-sm max-w-md w-full p-8 space-y-6">
         <div className="text-center space-y-2">
-          <div className="w-12 h-12 rounded-2xl bg-[#E9784B] flex items-center justify-center text-white font-black text-2xl mx-auto shadow-sm">
-            P
-          </div>
+          <img
+            src="/passon-logo.png"
+            alt="VNR Logo"
+            className="h-12 sm:h-14 w-auto object-contain mx-auto transition-transform hover:scale-105"
+          />
           <h1 className="text-2xl font-extrabold text-stone-900">
             {isForgotPasswordMode ? 'Reset Your Password' : 'Welcome back to PassOn'}
           </h1>
