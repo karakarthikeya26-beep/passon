@@ -58,25 +58,25 @@ export const Navbar: React.FC = () => {
           
           {/* Logo & Tagline */}
           <div className="flex items-center gap-4">
-            <Link href="/" className="flex items-center gap-3 group shrink-0">
+            <Link href="/" className="flex items-center gap-2.5 group shrink-0">
               <img
                 src="/favicon.ico"
                 alt="VNR Logo"
                 className="h-8 sm:h-10 w-auto object-contain transition-transform group-hover:scale-105 shrink-0"
               />
+              <img
+                src="/passon-logo.png"
+                alt="PassOn Logo"
+                className="h-7 sm:h-9 w-auto object-contain transition-transform group-hover:scale-105 shrink-0"
+              />
               <div className="h-8 w-[1px] bg-stone-200 hidden xs:block" />
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#E9784B] flex items-center justify-center text-white font-black text-lg shadow-sm group-hover:scale-105 transition-transform shrink-0">
-                  P
-                </div>
-                <div className="flex flex-col">
-                  <span className="font-extrabold text-base sm:text-lg tracking-tight text-[#292524] group-hover:text-[#E9784B] transition-colors leading-tight">
-                    PassOn
-                  </span>
-                  <span className="text-[9px] sm:text-[10px] font-bold text-[#E9784B] tracking-wider uppercase leading-none mt-0.5 whitespace-nowrap">
-                    VNR Campus Community
-                  </span>
-                </div>
+              <div className="flex flex-col">
+                <span className="font-extrabold text-base sm:text-lg tracking-tight text-[#292524] group-hover:text-[#E9784B] transition-colors leading-tight">
+                  PassOn
+                </span>
+                <span className="text-[9px] sm:text-[10px] font-bold text-[#E9784B] tracking-wider uppercase leading-none mt-0.5 whitespace-nowrap">
+                  VNR Campus Community
+                </span>
               </div>
             </Link>
 
