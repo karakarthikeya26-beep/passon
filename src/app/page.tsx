@@ -49,18 +49,16 @@ export default function HomePage() {
             <span>VNR VJIET Student Community Platform</span>
           </div>
 
-          <h1 className="text-4xl sm:text-6xl font-black text-[#292524] tracking-tight leading-tight uppercase">
-            PASS IT FORWARD<span className="text-[#E9784B]">.</span>
+          <h1 className="text-4xl sm:text-6xl font-black text-[#292524] tracking-tight leading-tight uppercase flex items-center justify-center gap-3 sm:gap-4 flex-wrap">
+            <img
+              src="/passon-logo.png"
+              alt="VNR Logo"
+              className="h-10 sm:h-14 md:h-16 w-auto object-contain shrink-0"
+            />
+            <span>
+              PASSON<span className="text-[#E9784B]">.</span>
+            </span>
           </h1>
-
-          <div className="space-y-2">
-            <p className="text-xl sm:text-2xl font-bold text-[#E9784B]">
-              “What you don't need. What someone else does.”
-            </p>
-            <p className="text-sm sm:text-base text-[#78716C] max-w-2xl mx-auto font-medium leading-relaxed">
-              Exchange useful things, find what you need, and share knowledge with the students who come after you.
-            </p>
-          </div>
 
           {/* Action CTAs */}
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
