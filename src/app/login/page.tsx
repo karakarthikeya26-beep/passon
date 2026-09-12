@@ -16,11 +16,14 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    const success = await login(email, password);
-    if (success) {
+    const result = await login(email, password);
+    if (result.success) {
       router.push('/marketplace');
     } else {
-      setError('User with this email was not found. Please sign up or click a quick demo account below.');
+      setError(
+        result.error ||
+          'User with this email was not found. Please sign up or click a quick demo account below.'
+      );
     }
   };
 

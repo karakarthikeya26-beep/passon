@@ -8,7 +8,7 @@ import { ListingCard } from '../components/listing-card';
 import { LookingForCard } from '../components/looking-for-card';
 import { KnowledgeCard } from '../components/knowledge-card';
 import {
-  Package, SearchCode, BookOpen, ArrowRight, Search, Sparkles,
+  Package, SearchCode, BookOpen, ArrowRight, Search,
   Handshake, CheckCircle2, MessageSquare, Repeat
 } from 'lucide-react';
 import { Category } from '../types';
@@ -44,11 +44,6 @@ export default function HomePage() {
       {/* Hero Section */}
       <section className="relative overflow-hidden pt-12 pb-16 px-4 sm:px-6 lg:px-8 border-b border-[#E7E5E4] bg-[#FFFCF8]">
         <div className="max-w-5xl mx-auto text-center space-y-8 relative z-10">
-          <div className="inline-flex items-center gap-2 bg-[#FFF1E8] border border-[#F6C7A9] text-[#E9784B] text-xs font-extrabold px-4 py-1.5 rounded-full shadow-xs">
-            <Sparkles className="w-3.5 h-3.5 fill-current" />
-            <span>VNR VJIET Student Community Platform</span>
-          </div>
-
           <h1 className="text-4xl sm:text-6xl font-black text-[#292524] tracking-tight leading-tight uppercase flex items-center justify-center gap-3 sm:gap-4 flex-wrap">
             <img
               src="/passon-logo.png"

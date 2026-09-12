@@ -5,10 +5,25 @@ import { User, Gender } from '../types';
 import { dbService, initializeDatabase } from '../lib/db';
 import { supabase, isSupabaseConfigured, getURL, getNeutralAvatarUrl } from '../lib/supabase';
 
+export interface SignupResult {
+  success: boolean;
+  user?: User | null;
+  requiresVerification?: boolean;
+  message?: string;
+  error?: string;
+  isAlreadyRegistered?: boolean;
+}
+
+export interface LoginResult {
+  success: boolean;
+  user?: User | null;
+  error?: string;
+}
+
 interface AuthContextType {
   currentUser: User | null;
   users: User[];
-  login: (email: string, password?: string) => Promise<boolean>;
+  login: (email: string, password?: string) => Promise<LoginResult>;
   signup: (
     name: string,
     email: string,
@@ -17,7 +32,7 @@ interface AuthContextType {
     batch?: string,
     gender?: Gender,
     bio?: string
-  ) => Promise<User | null>;
+  ) => Promise<SignupResult>;
   logout: () => Promise<void>;
   switchDemoUser: (userId: string) => void;
   updateProfile: (data: Partial<User>) => void;
@@ -59,6 +74,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let subscription: any = null;
     if (isSupabaseConfigured) {
       const authListener = supabase.auth.onAuthStateChange(async (_event: string, session: any) => {
+        console.log('[AuthContext] Auth state changed:', _event, session?.user?.email);
         if (session?.user) {
           const userEmail = session.user.email?.toLowerCase();
           const storedUsers = dbService.getUsers();
@@ -74,6 +90,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               branch: session.user.user_metadata?.branch || 'Computer Science & Engineering',
               batch: session.user.user_metadata?.batch || '2nd Year (2024-2028)',
               gender: session.user.user_metadata?.gender || 'Prefer not to say',
+              bio: session.user.user_metadata?.bio || '',
               avatar_url: getNeutralAvatarUrl(session.user.user_metadata?.name),
               role: 'student',
               created_at: new Date().toISOString(),
@@ -95,10 +112,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const login = async (email: string, password?: string): Promise<boolean> => {
+  const login = async (email: string, password?: string): Promise<LoginResult> => {
     initializeDatabase();
 
     const cleanEmail = email.trim().toLowerCase();
+    console.log('[AuthContext] Attempting login for:', cleanEmail);
 
     if (isSupabaseConfigured && password) {
       try {
@@ -106,11 +124,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           email: cleanEmail,
           password,
         });
-        if (!error && data?.user) {
-          console.log('Supabase authenticated user:', data.user.email);
+
+        if (error) {
+          console.error('[AuthContext] Supabase signIn error:', error.message);
+          const errMsg = error.message.toLowerCase();
+          if (errMsg.includes('email not confirmed')) {
+            return {
+              success: false,
+              error: 'Email not verified yet. Please check your inbox and click the verification link.',
+            };
+          }
+          if (errMsg.includes('invalid login credentials')) {
+            return {
+              success: false,
+              error: 'Invalid email or password. Please check your credentials and try again.',
+            };
+          }
+          return { success: false, error: error.message };
         }
-      } catch (err) {
-        console.warn('Supabase signInWithPassword note:', err);
+
+        if (data?.user) {
+          console.log('[AuthContext] Supabase authenticated user:', data.user.email);
+        }
+      } catch (err: any) {
+        console.warn('[AuthContext] Supabase signInWithPassword note:', err);
       }
     }
 
@@ -121,10 +158,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCurrentUser(foundUser);
       dbService.setCurrentUserId(foundUser.id);
       setUsers(allUsers);
-      return true;
+      return { success: true, user: foundUser };
     }
 
-    return false;
+    return {
+      success: false,
+      error: 'User with this email was not found. Please sign up or click a quick demo account below.',
+    };
   };
 
   const signup = async (
@@ -135,63 +175,145 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     batch?: string,
     gender?: Gender,
     bio?: string
-  ): Promise<User | null> => {
+  ): Promise<SignupResult> => {
     initializeDatabase();
-    const allUsers = dbService.getUsers();
     const cleanEmail = email.trim().toLowerCase();
+    const cleanName = name.trim();
+    const allUsers = dbService.getUsers();
 
     const redirectUrl = `${getURL()}auth/callback`;
+    console.log('[AuthContext] Starting signup for:', cleanEmail, '| Redirect URL:', redirectUrl);
 
     if (isSupabaseConfigured) {
       try {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email: cleanEmail,
           password: password || 'PassOn2026!',
           options: {
             emailRedirectTo: redirectUrl,
             data: {
-              name: name.trim(),
+              name: cleanName,
               branch: branch || 'Computer Science & Engineering',
               batch: batch || '2nd Year (2024-2028)',
               gender: gender || 'Prefer not to say',
+              bio: bio?.trim() || '',
             },
           },
         });
+
+        console.log('[AuthContext] Supabase signUp response details:', {
+          hasData: Boolean(data),
+          hasUser: Boolean(data?.user),
+          hasSession: Boolean(data?.session),
+          identitiesLength: data?.user?.identities?.length,
+          error: error?.message,
+        });
+
         if (error) {
-          console.error('Supabase signUp error:', error.message);
+          console.error('[AuthContext] Supabase signUp error:', error.message);
+          const errMsg = error.message.toLowerCase();
+          if (
+            errMsg.includes('already registered') ||
+            errMsg.includes('already exists') ||
+            errMsg.includes('user_already_exists')
+          ) {
+            return {
+              success: false,
+              isAlreadyRegistered: true,
+              error: 'This email is already registered. Please log in.',
+            };
+          }
+          return {
+            success: false,
+            error: error.message,
+          };
         }
-      } catch (err) {
-        console.warn('Supabase auth signup note:', err);
+
+        if (data?.user) {
+          // If Supabase returns empty identities array, email already exists
+          if (data.user.identities && data.user.identities.length === 0) {
+            console.warn('[AuthContext] User already registered (empty identities returned by Supabase)');
+            return {
+              success: false,
+              isAlreadyRegistered: true,
+              error: 'This email is already registered. Please log in.',
+            };
+          }
+
+          const existingUser = allUsers.find((u) => u.email.toLowerCase() === cleanEmail);
+          const newUserObj: User = {
+            id: data.user.id || existingUser?.id || `user-${Date.now()}`,
+            name: cleanName,
+            email: cleanEmail,
+            branch: branch || 'Computer Science & Engineering',
+            batch: batch || '2nd Year (2024-2028)',
+            gender: gender || 'Prefer not to say',
+            bio: bio?.trim() || '',
+            avatar_url: getNeutralAvatarUrl(cleanName),
+            role: 'student',
+            created_at: new Date().toISOString(),
+          };
+
+          if (existingUser) {
+            dbService.updateProfile(existingUser.id, newUserObj);
+          } else {
+            const updatedUsers = [newUserObj, ...allUsers];
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('passon_users', JSON.stringify(updatedUsers));
+              window.dispatchEvent(new Event('passon_db_change'));
+            }
+            setUsers(updatedUsers);
+          }
+
+          // Case 1: Email confirmation required (data.session is null)
+          if (!data.session) {
+            console.log('[AuthContext] Account created. Verification email sent to:', cleanEmail);
+            return {
+              success: true,
+              requiresVerification: true,
+              message: 'Account created successfully. Please check your email to verify your account.',
+            };
+          }
+
+          // Case 2: Direct session created (email confirmation disabled in Supabase)
+          console.log('[AuthContext] Account created & logged in immediately:', cleanEmail);
+          setCurrentUser(newUserObj);
+          dbService.setCurrentUserId(newUserObj.id);
+          return {
+            success: true,
+            requiresVerification: false,
+            user: newUserObj,
+            message: 'Account created successfully.',
+          };
+        }
+      } catch (err: any) {
+        console.error('[AuthContext] Unexpected signup exception:', err);
+        return {
+          success: false,
+          error: err.message || 'An unexpected error occurred during signup.',
+        };
       }
     }
 
+    // Local fallback if Supabase is not configured
     const existingUser = allUsers.find((u) => u.email.toLowerCase() === cleanEmail);
-
     if (existingUser) {
-      const updatedUser: User = {
-        ...existingUser,
-        name: name.trim() || existingUser.name,
-        branch: branch || existingUser.branch,
-        batch: batch || existingUser.batch,
-        gender: gender || existingUser.gender || 'Prefer not to say',
-        bio: bio?.trim() || existingUser.bio || '',
+      return {
+        success: false,
+        isAlreadyRegistered: true,
+        error: 'This email is already registered. Please log in.',
       };
-      dbService.updateProfile(existingUser.id, updatedUser);
-      setCurrentUser(updatedUser);
-      dbService.setCurrentUserId(existingUser.id);
-      setUsers(dbService.getUsers());
-      return updatedUser;
     }
 
     const newUser: User = {
       id: `user-${Date.now()}`,
-      name: name.trim(),
+      name: cleanName,
       email: cleanEmail,
       branch: branch || 'Computer Science & Engineering',
       batch: batch || '2nd Year (2024-2028)',
       gender: gender || 'Prefer not to say',
       bio: bio?.trim() || '',
-      avatar_url: getNeutralAvatarUrl(name),
+      avatar_url: getNeutralAvatarUrl(cleanName),
       role: 'student',
       created_at: new Date().toISOString(),
     };
@@ -206,7 +328,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     dbService.setCurrentUserId(newUser.id);
     setUsers(updatedUsers);
 
-    return newUser;
+    return {
+      success: true,
+      requiresVerification: false,
+      user: newUser,
+      message: 'Account created successfully.',
+    };
   };
 
   const logout = async () => {
