@@ -151,14 +151,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return { success: false, error: error.message };
         }
 
+        // ✅ Supabase confirmed the session — find or build the local profile.
         if (data?.user) {
           console.log('[AuthContext] Supabase authenticated user:', data.user.email);
+          const allUsers = dbService.getUsers();
+          const existingUser = allUsers.find((u) => u.email.toLowerCase() === cleanEmail);
+
+          if (existingUser) {
+            setCurrentUser(existingUser);
+            dbService.setCurrentUserId(existingUser.id);
+            setUsers(allUsers);
+            return { success: true, user: existingUser };
+          }
+
+          // Profile is missing from localStorage (cleared storage / new device).
+          // Build it from the Supabase user metadata and persist it.
+          const newUser: User = {
+            id: data.user.id,
+            name: data.user.user_metadata?.name || cleanEmail.split('@')[0] || 'VNR Student',
+            email: cleanEmail,
+            branch: data.user.user_metadata?.branch || 'Computer Science & Engineering',
+            batch: data.user.user_metadata?.batch || '2nd Year (2024-2028)',
+            gender: data.user.user_metadata?.gender || 'Prefer not to say',
+            bio: data.user.user_metadata?.bio || '',
+            avatar_url: getNeutralAvatarUrl(data.user.user_metadata?.name),
+            role: 'student',
+            created_at: data.user.created_at || new Date().toISOString(),
+          };
+          const updatedUsers = [newUser, ...allUsers];
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('passon_users', JSON.stringify(updatedUsers));
+          }
+          setCurrentUser(newUser);
+          dbService.setCurrentUserId(newUser.id);
+          setUsers(updatedUsers);
+          return { success: true, user: newUser };
         }
       } catch (err: any) {
         console.warn('[AuthContext] Supabase signInWithPassword note:', err);
       }
     }
 
+    // Supabase is not configured — fall back to the local localStorage store.
     const allUsers = dbService.getUsers();
     const foundUser = allUsers.find((u) => u.email.toLowerCase() === cleanEmail);
 
@@ -171,7 +205,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return {
       success: false,
-      error: 'User with this email was not found. Please sign up or click a quick demo account below.',
+      error: 'User with this email was not found. Please sign up or check your credentials.',
     };
   };
 
@@ -352,7 +386,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: false, error: 'Please enter your registered email address.' };
     }
 
-    const redirectUrl = `${getURL()}auth/callback?next=/auth/reset-password`;
+    // Point directly at /reset-password so Supabase delivers ?code= straight to the
+    // client-side page that can exchange it for a browser session.
+    const baseUrl = getURL().replace(/\/$/, '');
+    const redirectUrl = `${baseUrl}/reset-password`;
     console.log('[AuthContext] resetPasswordForEmail for:', cleanEmail, '| Redirect:', redirectUrl);
 
     if (isSupabaseConfigured) {

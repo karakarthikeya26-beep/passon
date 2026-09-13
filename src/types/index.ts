@@ -184,9 +184,68 @@ export interface Report {
 export interface Notification {
   id: string;
   user_id: string;
-  type: 'INTEREST_RECEIVED' | 'INTEREST_ACCEPTED' | 'RESERVED' | 'HANDOVER_PLANNED' | 'EXCHANGE_COMPLETED' | 'NEW_MATCH' | 'KNOWLEDGE_PUBLISHED';
+  type: 'INTEREST_RECEIVED' | 'INTEREST_ACCEPTED' | 'RESERVED' | 'HANDOVER_PLANNED' | 'EXCHANGE_COMPLETED' | 'NEW_MATCH' | 'KNOWLEDGE_PUBLISHED' | 'NEW_MESSAGE';
   message: string;
   link?: string;
   read: boolean;
   created_at: string;
+}
+
+export interface Message {
+  id: string;
+  interest_id: string;
+  listing_id?: string;
+  sender_id: string;
+  sender?: User;
+  recipient_id: string;
+  recipient?: User;
+  content: string;
+  created_at: string;
+  read: boolean;
+  system_event?: boolean;
+}
+
+export interface Conversation {
+  interest: Interest;
+  listing: Listing;
+  otherUser: User;
+  lastMessage?: Message;
+  unreadCount: number;
+  status: InterestStatus | ListingStatus;
+  updated_at: string;
+}
+
+export type ActivityCategory =
+  | 'All'
+  | 'Interests Sent'
+  | 'Interests Received'
+  | 'Messages'
+  | 'Matches'
+  | 'Exchanges'
+  | 'Completed';
+
+export interface ActivityItem {
+  id: string;
+  type:
+    | 'INTEREST_SENT'
+    | 'INTEREST_RECEIVED'
+    | 'MESSAGE'
+    | 'INTEREST_ACCEPTED'
+    | 'INTEREST_DECLINED'
+    | 'HANDOVER_PLANNED'
+    | 'EXCHANGE_COMPLETED'
+    | 'LISTING_POSTED'
+    | 'MATCH_FOUND';
+  category: ActivityCategory;
+  title: string;
+  description: string;
+  timestamp: string;
+  status: string;
+  statusColor: 'emerald' | 'amber' | 'rose' | 'purple' | 'blue' | 'stone';
+  item?: Listing;
+  otherUser?: User;
+  isOwner: boolean;
+  interestId?: string;
+  link: string;
+  actionLabel?: string;
 }

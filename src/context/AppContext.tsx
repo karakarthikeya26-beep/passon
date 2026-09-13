@@ -3,9 +3,10 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import {
   Listing, Interest, Handover, LookingFor, Match, KnowledgePost,
-  SavedListing, SavedKnowledge, Notification, Report, Feedback
+  SavedListing, SavedKnowledge, Notification, Report, Feedback, Message
 } from '../types';
 import { dbService, initializeDatabase } from '../lib/db';
+import { messageService } from '../lib/messages';
 import { useAuth } from './AuthContext';
 
 export interface ToastMessage {
@@ -24,6 +25,8 @@ interface AppContextType {
   savedListings: SavedListing[];
   savedKnowledge: SavedKnowledge[];
   notifications: Notification[];
+  messages: Message[];
+  unreadMessageCount: number;
   reports: Report[];
   feedbacks: Feedback[];
   toasts: ToastMessage[];
@@ -41,6 +44,10 @@ interface AppContextType {
 
   planHandover: (listingId: string, interestId: string, date: string, time: string, location: string, note?: string) => Handover;
   completeExchange: (listingId: string) => void;
+
+  sendMessage: (interestId: string, recipientId: string, content: string, listingId?: string) => Promise<Message>;
+  markConversationRead: (interestId: string) => Promise<void>;
+  getConversationMessages: (interestId: string) => Message[];
 
   createLookingFor: (data: Omit<LookingFor, 'id' | 'created_at' | 'updated_at' | 'status'>) => LookingFor;
   updateLookingForStatus: (id: string, status: LookingFor['status']) => void;
@@ -74,6 +81,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [savedListings, setSavedListings] = useState<SavedListing[]>([]);
   const [savedKnowledge, setSavedKnowledge] = useState<SavedKnowledge[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [unreadMessageCount, setUnreadMessageCount] = useState<number>(0);
   const [reports, setReports] = useState<Report[]>([]);
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -87,17 +96,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setKnowledgePosts(dbService.getKnowledgePosts());
     setReports(dbService.getReports());
     setFeedbacks(dbService.getFeedbacks());
+    setMessages(dbService.getMessages());
 
     if (currentUser) {
       setSavedListings(dbService.getSavedListings(currentUser.id));
       setSavedKnowledge(dbService.getSavedKnowledge(currentUser.id));
       setNotifications(dbService.getNotifications(currentUser.id));
       setMatches(dbService.getMatchesForUser(currentUser.id));
+      setUnreadMessageCount(dbService.getUnreadMessageCount(currentUser.id));
     } else {
       setSavedListings([]);
       setSavedKnowledge([]);
       setNotifications([]);
       setMatches([]);
+      setUnreadMessageCount(0);
     }
   }, [currentUser]);
 
@@ -238,6 +250,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast(`Report updated to ${status}.`, 'info');
   };
 
+  const sendMessage = useCallback(async (interestId: string, recipientId: string, content: string, listingId?: string) => {
+    if (!currentUser) throw new Error('Must be logged in');
+    const msg = await messageService.sendMessage({
+      interest_id: interestId,
+      listing_id: listingId,
+      sender_id: currentUser.id,
+      recipient_id: recipientId,
+      content,
+    });
+    refreshData();
+    return msg;
+  }, [currentUser, refreshData]);
+
+  const markConversationRead = useCallback(async (interestId: string) => {
+    if (!currentUser) return;
+    await messageService.markAsRead(interestId, currentUser.id);
+    refreshData();
+  }, [currentUser, refreshData]);
+
+  const getConversationMessages = (interestId: string) => {
+    return messages
+      .filter((m) => m.interest_id === interestId)
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  };
+
   const markNotificationRead = (id: string) => {
     dbService.markNotificationRead(id);
     refreshData();
@@ -262,6 +299,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         savedListings,
         savedKnowledge,
         notifications,
+        messages,
+        unreadMessageCount,
         reports,
         feedbacks,
         toasts,
@@ -275,6 +314,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         declineInterest,
         planHandover,
         completeExchange,
+        sendMessage,
+        markConversationRead,
+        getConversationMessages,
         createLookingFor,
         updateLookingForStatus,
         createKnowledgePost,

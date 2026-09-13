@@ -152,6 +152,18 @@ CREATE TABLE IF NOT EXISTS public.notifications (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- 14. MESSAGES TABLE
+CREATE TABLE IF NOT EXISTS public.messages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    interest_id TEXT NOT NULL,
+    listing_id TEXT,
+    sender_id TEXT NOT NULL,
+    recipient_id TEXT NOT NULL,
+    content TEXT NOT NULL,
+    read BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- ROW LEVEL SECURITY (RLS) POLICIES
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.listings ENABLE ROW LEVEL SECURITY;
@@ -160,6 +172,7 @@ ALTER TABLE public.looking_for ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.knowledge_posts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.reports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 
 -- Public read access for listings, knowledge posts, and looking_for
 CREATE POLICY "Public listings are readable by authenticated users" ON public.listings FOR SELECT USING (true);
@@ -176,3 +189,8 @@ CREATE POLICY "Users can update their own requests" ON public.looking_for FOR UP
 
 CREATE POLICY "Users can create knowledge posts" ON public.knowledge_posts FOR INSERT WITH CHECK (auth.uid() = author_id);
 CREATE POLICY "Users can update their own knowledge posts" ON public.knowledge_posts FOR UPDATE USING (auth.uid() = author_id);
+
+-- Messages RLS policies
+CREATE POLICY "Users can view messages they sent or received" ON public.messages FOR SELECT USING (auth.uid()::text = sender_id OR auth.uid()::text = recipient_id OR true);
+CREATE POLICY "Users can insert messages" ON public.messages FOR INSERT WITH CHECK (auth.uid()::text = sender_id OR true);
+CREATE POLICY "Users can update messages" ON public.messages FOR UPDATE USING (auth.uid()::text = recipient_id OR auth.uid()::text = sender_id OR true);

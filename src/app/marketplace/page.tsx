@@ -216,7 +216,7 @@ export default function MarketplacePage() {
         <div>
           <h1 className="text-3xl font-black text-[#292524] tracking-tight flex items-center gap-2.5">
             <Package className="w-8 h-8 text-[#E9784B]" />
-            VNR Student Marketplace
+            SwapSpot
           </h1>
           <p className="text-xs text-stone-500 font-medium mt-1">
             Find useful things from students around you.

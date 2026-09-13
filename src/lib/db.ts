@@ -1,6 +1,6 @@
 import {
   User, Listing, LookingFor, KnowledgePost, Interest, Handover,
-  SavedListing, SavedKnowledge, Feedback, Report, Notification, Match
+  SavedListing, SavedKnowledge, Feedback, Report, Notification, Match, Message
 } from '../types';
 import { MOCK_USERS, MOCK_LISTINGS, MOCK_LOOKING_FOR, MOCK_KNOWLEDGE_POSTS, MOCK_INTERESTS, MOCK_NOTIFICATIONS } from './mock-data';
 import { calculateMatches } from './matcher';
@@ -11,6 +11,7 @@ const STORAGE_KEYS = {
   LOOKING_FOR: 'passon_looking_for',
   KNOWLEDGE: 'passon_knowledge',
   INTERESTS: 'passon_interests',
+  MESSAGES: 'passon_messages',
   HANDOVERS: 'passon_handovers',
   SAVED_LISTINGS: 'passon_saved_listings',
   SAVED_KNOWLEDGE: 'passon_saved_knowledge',
@@ -67,6 +68,9 @@ export function initializeDatabase() {
   }
   if (!localStorage.getItem(STORAGE_KEYS.INTERESTS)) {
     localStorage.setItem(STORAGE_KEYS.INTERESTS, JSON.stringify([]));
+  }
+  if (!localStorage.getItem(STORAGE_KEYS.MESSAGES)) {
+    localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify([]));
   }
   if (!localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS)) {
     localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify([]));
@@ -184,14 +188,26 @@ export const dbService = {
       dbService.updateListingStatus(listing_id, 'INTERESTED');
     }
 
-    // Notify owner
+    // Record initial message if provided
+    if (message && message.trim() && listing) {
+      dbService.createMessage(
+        interest.id,
+        student_id,
+        listing.owner_id,
+        message.trim(),
+        listing_id,
+        false
+      );
+    }
+
+    // Notify owner with direct link to conversation
     if (listing) {
       const student = dbService.getUserById(student_id);
       dbService.createNotification(
         listing.owner_id,
         'INTEREST_RECEIVED',
         `${student?.name || 'A student'} expressed interest in your ${listing.title}.`,
-        '/activity'
+        `/matches?conversation=${interest.id}`
       );
     }
 
@@ -221,12 +237,22 @@ export const dbService = {
       });
       setStored(STORAGE_KEYS.INTERESTS, interests);
 
-      // Notify interested student
+      // Record system event in conversation
+      dbService.createMessage(
+        interest.id,
+        listing.owner_id,
+        interest.student_id,
+        `Interest accepted! Listing is now reserved. Handover can be planned.`,
+        listing.id,
+        true
+      );
+
+      // Notify interested student with direct link to conversation
       dbService.createNotification(
         interest.student_id,
         'INTEREST_ACCEPTED',
         `Your interest in "${listing.title}" was accepted! Handover can now be planned.`,
-        '/activity'
+        `/matches?conversation=${interest.id}`
       );
     }
 
@@ -252,15 +278,25 @@ export const dbService = {
 
     dbService.updateListingStatus(listing_id, 'HANDOVER_PLANNED');
 
-    // Notify interested student
+    // Record system event in conversation
     const interest = dbService.getInterests().find((i) => i.id === interest_id);
     const listing = dbService.getListingById(listing_id);
     if (interest && listing) {
+      dbService.createMessage(
+        interest_id,
+        listing.owner_id,
+        interest.student_id,
+        `Campus handover planned at ${location} on ${date} (${time}).${note ? ` Note: "${note}"` : ''}`,
+        listing_id,
+        true
+      );
+
+      // Notify interested student
       dbService.createNotification(
         interest.student_id,
         'HANDOVER_PLANNED',
         `Campus handover planned for "${listing.title}" at ${location} on ${date} (${time}).`,
-        '/activity'
+        `/matches?conversation=${interest_id}`
       );
     }
 
@@ -278,12 +314,22 @@ export const dbService = {
     const listing = dbService.getListingById(listing_id);
     const interest = dbService.getInterests().find((i) => i.listing_id === listing_id && i.status === 'ACCEPTED');
     if (listing && interest) {
+      // Record system event in conversation
+      dbService.createMessage(
+        interest.id,
+        listing.owner_id,
+        interest.student_id,
+        `Exchange for "${listing.title}" marked as completed. Thank you!`,
+        listing_id,
+        true
+      );
+
       // Notify buyer to leave feedback
       dbService.createNotification(
         interest.student_id,
         'EXCHANGE_COMPLETED',
         `Exchange for "${listing.title}" marked as completed. Tap to leave feedback for the owner.`,
-        '/activity'
+        `/matches?conversation=${interest.id}`
       );
     }
   },
@@ -506,5 +552,69 @@ export const dbService = {
       if (n.user_id === userId) n.read = true;
     });
     setStored(STORAGE_KEYS.NOTIFICATIONS, notifs);
+  },
+
+  // MESSAGES
+  getMessages: (): Message[] => {
+    const messages = getStored<Message[]>(STORAGE_KEYS.MESSAGES, []);
+    const users = dbService.getUsers();
+    return messages.map((m) => ({
+      ...m,
+      sender: users.find((u) => u.id === m.sender_id),
+      recipient: users.find((u) => u.id === m.recipient_id),
+    }));
+  },
+  getMessagesByInterest: (interestId: string): Message[] => {
+    const all = dbService.getMessages();
+    return all
+      .filter((m) => m.interest_id === interestId)
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  },
+  createMessage: (
+    interest_id: string,
+    sender_id: string,
+    recipient_id: string,
+    content: string,
+    listing_id?: string,
+    system_event?: boolean
+  ): Message => {
+    const messages = getStored<Message[]>(STORAGE_KEYS.MESSAGES, []);
+    const msg: Message = {
+      id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      interest_id,
+      listing_id,
+      sender_id,
+      recipient_id,
+      content,
+      read: false,
+      system_event: system_event || false,
+      created_at: new Date().toISOString(),
+    };
+    setStored(STORAGE_KEYS.MESSAGES, [...messages, msg]);
+    return msg;
+  },
+  createOrMergeMessage: (msg: Message): void => {
+    const messages = getStored<Message[]>(STORAGE_KEYS.MESSAGES, []);
+    const exists = messages.some((m) => m.id === msg.id);
+    if (!exists) {
+      setStored(STORAGE_KEYS.MESSAGES, [...messages, msg]);
+    }
+  },
+  markMessagesAsRead: (interestId: string, recipientId: string): void => {
+    const messages = getStored<Message[]>(STORAGE_KEYS.MESSAGES, []);
+    let changed = false;
+    messages.forEach((m) => {
+      if (m.interest_id === interestId && m.recipient_id === recipientId && !m.read) {
+        m.read = true;
+        changed = true;
+      }
+    });
+    if (changed) {
+      setStored(STORAGE_KEYS.MESSAGES, messages);
+    }
+  },
+  getUnreadMessageCount: (userId: string): number => {
+    const messages = getStored<Message[]>(STORAGE_KEYS.MESSAGES, []);
+    return messages.filter((m) => m.recipient_id === userId && !m.read && !m.system_event).length;
   },
 };

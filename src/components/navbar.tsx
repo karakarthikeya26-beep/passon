@@ -17,7 +17,7 @@ export const Navbar: React.FC = () => {
   const pathname = usePathname();
   const router = useRouter();
   const { currentUser, logout } = useAuth();
-  const { notifications, markNotificationRead, markAllNotificationsRead } = useApp();
+  const { notifications, markNotificationRead, markAllNotificationsRead, unreadMessageCount } = useApp();
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -44,7 +44,7 @@ export const Navbar: React.FC = () => {
 
   const navLinks = [
     { name: 'Home', href: '/' },
-    { name: 'Marketplace', href: '/marketplace' },
+    { name: 'SwapSpot', href: '/marketplace' },
     { name: 'Looking For', href: '/looking-for' },
     { name: 'Knowledge Shelf', href: '/knowledge' },
     { name: 'Matches', href: '/matches' },
@@ -79,17 +79,24 @@ export const Navbar: React.FC = () => {
             <nav className="hidden lg:flex items-center gap-1 ml-4">
               {navLinks.map((link) => {
                 const isActive = pathname === link.href;
+                const isMatches = link.name === 'Matches';
+
                 return (
                   <Link
                     key={link.href}
                     href={link.href}
-                    className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+                    className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
                       isActive
                         ? 'bg-[#FFF1E8] text-[#E9784B] font-bold border border-[#F6C7A9]/60'
                         : 'text-[#78716C] hover:text-[#292524] hover:bg-stone-100/70'
                     }`}
                   >
-                    {link.name}
+                    <span>{link.name}</span>
+                    {isMatches && unreadMessageCount > 0 && (
+                      <span className="bg-[#E9784B] text-white text-[9px] font-extrabold px-1.5 py-0.2 rounded-full">
+                        {unreadMessageCount}
+                      </span>
+                    )}
                   </Link>
                 );
               })}
@@ -317,18 +324,26 @@ export const Navbar: React.FC = () => {
         {/* Mobile Navigation Drawer */}
         {isMobileMenuOpen && (
           <div className="lg:hidden border-t border-stone-200 bg-white px-4 py-4 space-y-2">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setIsMobileMenuOpen(false)}
-                className={`block px-3 py-2 rounded-xl text-sm font-semibold ${
-                  pathname === link.href ? 'bg-[#FFF1E8] text-[#E9784B]' : 'text-stone-700 hover:bg-stone-100'
-                }`}
-              >
-                {link.name}
-              </Link>
-            ))}
+            {navLinks.map((link) => {
+              const isMatches = link.name === 'Matches';
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={`flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold ${
+                    pathname === link.href ? 'bg-[#FFF1E8] text-[#E9784B]' : 'text-stone-700 hover:bg-stone-100'
+                  }`}
+                >
+                  <span>{link.name}</span>
+                  {isMatches && unreadMessageCount > 0 && (
+                    <span className="bg-[#E9784B] text-white text-[10px] font-extrabold px-2 py-0.5 rounded-full">
+                      {unreadMessageCount} new
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
             <div className="pt-2 border-t border-stone-200 flex flex-col gap-2">
               <Link
                 href="/listing/new"
