@@ -117,9 +117,9 @@ async function runTests() {
   const createdListing = await listingService.createListing({
     owner_id: userA.id,
     title: 'Engineering Mechanics Textbook (Persisted)',
-    category: 'Books & Notes',
+    category: 'Books',
     condition: 'Like New',
-    mode: 'DONATE',
+    mode: 'Donate',
     price: 0,
     description: 'First year textbook in great condition',
     images: ['https://example.com/book.jpg']
@@ -182,11 +182,12 @@ async function runTests() {
   const listingD = await listingService.createListing({
     owner_id: userA.id,
     title: 'Lab Coat Chemistry',
-    category: 'Lab Equipment',
+    category: 'Lab',
     condition: 'Good',
-    mode: 'DONATE',
+    mode: 'Donate',
     price: 0,
-    description: 'Size M lab coat'
+    description: 'Size M lab coat',
+    images: []
   });
 
   // 2. User B views it - verify UI permission flag
@@ -290,10 +291,11 @@ async function runTests() {
     owner_id: userA.id,
     title: 'Scientific Calculator fx-991EX',
     category: 'Electronics',
-    condition: 'Excellent',
-    mode: 'BORROW',
+    condition: 'Like New',
+    mode: 'Exchange',
     price: 0,
-    description: 'Needed for engineering exam'
+    description: 'Needed for engineering exam',
+    images: []
   });
 
   // Switch to User B in Tab 2 and refresh listings
