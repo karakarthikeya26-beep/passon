@@ -61,7 +61,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUsers(storedUsers);
 
     const currentId = dbService.getCurrentUserId();
-    const user = storedUsers.find((u) => u.id === currentId) || storedUsers[0] || null;
+    const user = currentId ? (storedUsers.find((u) => u.id === currentId) || null) : null;
     setCurrentUser(user);
   };
 
@@ -73,7 +73,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const storedUsers = dbService.getUsers();
       setUsers(storedUsers);
       const currentId = dbService.getCurrentUserId();
-      const user = storedUsers.find((u) => u.id === currentId) || null;
+      const user = currentId ? (storedUsers.find((u) => u.id === currentId) || null) : null;
       setCurrentUser(user);
     };
 
@@ -83,6 +83,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (isSupabaseConfigured) {
       const authListener = supabase.auth.onAuthStateChange(async (_event: string, session: any) => {
         console.log('[AuthContext] Auth state changed:', _event, session?.user?.email);
+        if (_event === 'SIGNED_OUT') {
+          setCurrentUser(null);
+          dbService.setCurrentUserId('');
+          return;
+        }
+
         if (session?.user) {
           const userEmail = session.user.email?.toLowerCase();
           const storedUsers = dbService.getUsers();
@@ -466,13 +472,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (isSupabaseConfigured) {
       try {
         await supabase.auth.signOut();
-      } catch (e) {}
+      } catch (e) {
+        console.warn('[AuthContext] Supabase signOut notice:', e);
+      }
     }
     setCurrentUser(null);
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('passon_current_user_id');
-      window.dispatchEvent(new Event('passon_db_change'));
-    }
+    dbService.setCurrentUserId('');
   };
 
   const switchDemoUser = (userId: string) => {

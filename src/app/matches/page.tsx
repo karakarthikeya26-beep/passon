@@ -161,7 +161,17 @@ function MatchesAndConversationsContent() {
         otherUser,
         lastMessage,
         unreadCount,
-        status: listing.status === 'AVAILABLE' ? interest.status : listing.status,
+        status: (
+          interest.status?.toUpperCase() === 'DECLINED'
+            ? 'DECLINED'
+            : listing.status === 'COMPLETED'
+            ? 'COMPLETED'
+            : listing.status === 'HANDOVER_PLANNED'
+            ? 'HANDOVER_PLANNED'
+            : interest.status === 'ACCEPTED' || listing.status === 'RESERVED'
+            ? 'ACCEPTED'
+            : interest.status || 'PENDING'
+        ) as any,
         updated_at: lastMessage?.created_at || interest.updated_at || interest.created_at,
       };
     }).sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
@@ -301,7 +311,7 @@ function MatchesAndConversationsContent() {
       case 'COMPLETED':
         return <span className="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full text-[10px] font-bold">Completed</span>;
       case 'DECLINED':
-        return <span className="bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded-full text-[10px] font-bold">Declined</span>;
+        return <span className="bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded-full text-[10px] font-bold">Request Declined</span>;
       default:
         return <span className="bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full text-[10px] font-bold">Pending</span>;
     }
@@ -610,7 +620,7 @@ function MatchesAndConversationsContent() {
                         </button>
                       )}
 
-                      {activeConversation.status === 'HANDOVER_PLANNED' && (
+                      {isOwnerOfActive && activeConversation.status === 'HANDOVER_PLANNED' && (
                         <button
                           onClick={() => completeExchange(activeConversation.listing.id)}
                           className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-xs transition-all"

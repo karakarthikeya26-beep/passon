@@ -13,7 +13,7 @@ function MarketplaceContent() {
   const initialCat = searchParams.get('category') as Category | null;
   const initialQuery = searchParams.get('search') || '';
 
-  const { listings } = useApp();
+  const { listings, refreshData } = useApp();
 
   const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [selectedCategory, setSelectedCategory] = useState<Category | 'All'>(initialCat || 'All');
@@ -21,6 +21,10 @@ function MarketplaceContent() {
   const [selectedMode, setSelectedMode] = useState<ExchangeMode | 'All'>('All');
   const [selectedStatus, setSelectedStatus] = useState<ListingStatus | 'ActiveOnly'>('ActiveOnly');
   const [sortBy, setSortBy] = useState<'newest' | 'price_low' | 'price_high'>('newest');
+
+  useEffect(() => {
+    refreshData();
+  }, [refreshData]);
 
   useEffect(() => {
     if (initialCat) setSelectedCategory(initialCat);

@@ -4,6 +4,7 @@ import {
 } from '../types';
 import { MOCK_USERS, MOCK_LISTINGS, MOCK_LOOKING_FOR, MOCK_KNOWLEDGE_POSTS, MOCK_INTERESTS, MOCK_NOTIFICATIONS } from './mock-data';
 import { calculateMatches } from './matcher';
+import { generateUUID } from './supabase';
 
 const STORAGE_KEYS = {
   USERS: 'passon_users',
@@ -48,9 +49,7 @@ function setStored<T>(key: string, value: T): void {
 export function initializeDatabase() {
   if (typeof window === 'undefined') return;
 
-  const currentVersion = localStorage.getItem(STORAGE_KEYS.VERSION);
-  if (!currentVersion || currentVersion !== '4.0') {
-    localStorage.clear();
+  if (!localStorage.getItem(STORAGE_KEYS.VERSION)) {
     localStorage.setItem(STORAGE_KEYS.VERSION, '4.0');
   }
 
@@ -90,9 +89,8 @@ export function initializeDatabase() {
   if (!localStorage.getItem(STORAGE_KEYS.REPORTS)) {
     localStorage.setItem(STORAGE_KEYS.REPORTS, JSON.stringify([]));
   }
-  if (!localStorage.getItem(STORAGE_KEYS.CURRENT_USER)) {
-    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(''));
-  }
+  // Remove legacy shared CURRENT_USER from localStorage to guarantee tab isolation
+  localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
 }
 
 export const dbService = {
@@ -102,8 +100,33 @@ export const dbService = {
     const users = dbService.getUsers();
     return users.find((u) => u.id === id);
   },
-  getCurrentUserId: (): string => getStored(STORAGE_KEYS.CURRENT_USER, ''),
-  setCurrentUserId: (id: string) => setStored(STORAGE_KEYS.CURRENT_USER, id),
+  getCurrentUserId: (): string => {
+    if (typeof window === 'undefined') return '';
+    try {
+      const tabId = sessionStorage.getItem('passon_tab_user_id');
+      if (tabId !== null) {
+        return JSON.parse(tabId);
+      }
+      return '';
+    } catch {
+      return '';
+    }
+  },
+  setCurrentUserId: (id: string) => {
+    if (typeof window === 'undefined') return;
+    try {
+      if (!id) {
+        sessionStorage.removeItem('passon_tab_user_id');
+      } else {
+        sessionStorage.setItem('passon_tab_user_id', JSON.stringify(id));
+      }
+      // Ensure shared localStorage key is removed so tabs never interfere with each other
+      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+      window.dispatchEvent(new Event('passon_db_change'));
+    } catch (err) {
+      console.error('Error setting current user id', err);
+    }
+  },
   updateProfile: (userId: string, data: Partial<User>): User => {
     const users = dbService.getUsers();
     const index = users.findIndex((u) => u.id === userId);
@@ -131,7 +154,7 @@ export const dbService = {
     const listings = getStored<Listing[]>(STORAGE_KEYS.LISTINGS, []);
     const listing: Listing = {
       ...newListing,
-      id: `listing-${Date.now()}`,
+      id: generateUUID(),
       status: 'AVAILABLE',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -172,7 +195,7 @@ export const dbService = {
     if (existing) return existing;
 
     const interest: Interest = {
-      id: `interest-${Date.now()}`,
+      id: generateUUID(),
       listing_id,
       student_id,
       message,
@@ -254,6 +277,31 @@ export const dbService = {
         `Your interest in "${listing.title}" was accepted! Handover can now be planned.`,
         `/matches?conversation=${interest.id}`
       );
+    } else if (status === 'DECLINED' && listing) {
+      // Revert listing to AVAILABLE if no other accepted or pending interest exists
+      const hasOtherPending = interests.some((other) => other.listing_id === listing.id && other.id !== id && other.status === 'PENDING');
+      const hasOtherAccepted = interests.some((other) => other.listing_id === listing.id && other.status === 'ACCEPTED');
+      if (!hasOtherPending && !hasOtherAccepted && listing.status === 'INTERESTED') {
+        dbService.updateListingStatus(listing.id, 'AVAILABLE');
+      }
+
+      // Record system event in conversation
+      dbService.createMessage(
+        interest.id,
+        listing.owner_id,
+        interest.student_id,
+        `Interest request was declined by the owner.`,
+        listing.id,
+        true
+      );
+
+      // Notify student
+      dbService.createNotification(
+        interest.student_id,
+        'INTEREST_DECLINED',
+        `Your request for "${listing.title}" was declined by the owner.`,
+        `/marketplace/${listing.id}`
+      );
     }
 
     return interest;
@@ -264,7 +312,7 @@ export const dbService = {
   createHandover: (listing_id: string, interest_id: string, date: string, time: string, location: string, note?: string): Handover => {
     const handovers = dbService.getHandovers();
     const handover: Handover = {
-      id: `handover-${Date.now()}`,
+      id: generateUUID(),
       listing_id,
       interest_id,
       date,
@@ -302,7 +350,13 @@ export const dbService = {
 
     return handover;
   },
-  completeHandover: (listing_id: string): void => {
+  completeHandover: (listing_id: string, actorUserId?: string): void => {
+    const listing = dbService.getListingById(listing_id);
+    if (!listing) throw new Error('Listing not found');
+    if (actorUserId && listing.owner_id !== actorUserId) {
+      throw new Error('Unauthorized: Only the listing owner can mark it as complete.');
+    }
+
     dbService.updateListingStatus(listing_id, 'COMPLETED');
     const handovers = dbService.getHandovers();
     const index = handovers.findIndex((h) => h.listing_id === listing_id);
@@ -311,7 +365,6 @@ export const dbService = {
       setStored(STORAGE_KEYS.HANDOVERS, handovers);
     }
 
-    const listing = dbService.getListingById(listing_id);
     const interest = dbService.getInterests().find((i) => i.listing_id === listing_id && i.status === 'ACCEPTED');
     if (listing && interest) {
       // Record system event in conversation
@@ -347,7 +400,7 @@ export const dbService = {
     const requests = getStored<LookingFor[]>(STORAGE_KEYS.LOOKING_FOR, []);
     const req: LookingFor = {
       ...newReq,
-      id: `req-${Date.now()}`,
+      id: generateUUID(),
       status: 'OPEN',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -389,7 +442,7 @@ export const dbService = {
     const posts = getStored<KnowledgePost[]>(STORAGE_KEYS.KNOWLEDGE, []);
     const post: KnowledgePost = {
       ...newPost,
-      id: `post-${Date.now()}`,
+      id: generateUUID(),
       useful_count: 0,
       status: 'PUBLISHED',
       created_at: new Date().toISOString(),
@@ -425,7 +478,7 @@ export const dbService = {
       return false; // unsaved
     } else {
       saved.push({
-        id: `save-list-${Date.now()}`,
+        id: generateUUID(),
         user_id: userId,
         listing_id,
         created_at: new Date().toISOString(),
@@ -452,7 +505,7 @@ export const dbService = {
       return false; // unsaved
     } else {
       saved.push({
-        id: `save-know-${Date.now()}`,
+        id: generateUUID(),
         user_id: userId,
         knowledge_post_id,
         created_at: new Date().toISOString(),
@@ -474,7 +527,7 @@ export const dbService = {
   createFeedback: (exchange_id: string, from_user: string, to_user: string, rating: number, comment?: string): Feedback => {
     const feedbacks = dbService.getFeedbacks();
     const feedback: Feedback = {
-      id: `feedback-${Date.now()}`,
+      id: generateUUID(),
       exchange_id,
       from_user,
       to_user,
@@ -498,7 +551,7 @@ export const dbService = {
   createReport: (reporter_id: string, target_type: 'listing' | 'user' | 'knowledge', target_id: string, reason: Report['reason'], description?: string): Report => {
     const reports = dbService.getReports();
     const report: Report = {
-      id: `report-${Date.now()}`,
+      id: generateUUID(),
       reporter_id,
       target_type,
       target_id,
@@ -527,7 +580,7 @@ export const dbService = {
   createNotification: (user_id: string, type: Notification['type'], message: string, link?: string): Notification => {
     const notifs = getStored<Notification[]>(STORAGE_KEYS.NOTIFICATIONS, []);
     const notif: Notification = {
-      id: `notif-${Date.now()}`,
+      id: generateUUID(),
       user_id,
       type,
       message,
@@ -580,7 +633,7 @@ export const dbService = {
   ): Message => {
     const messages = getStored<Message[]>(STORAGE_KEYS.MESSAGES, []);
     const msg: Message = {
-      id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      id: generateUUID(),
       interest_id,
       listing_id,
       sender_id,

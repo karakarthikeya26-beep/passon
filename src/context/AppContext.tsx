@@ -6,7 +6,9 @@ import {
   SavedListing, SavedKnowledge, Notification, Report, Feedback, Message
 } from '../types';
 import { dbService, initializeDatabase } from '../lib/db';
+import { listingService } from '../lib/listings';
 import { messageService } from '../lib/messages';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 
 export interface ToastMessage {
@@ -34,16 +36,16 @@ interface AppContextType {
   removeToast: (id: string) => void;
 
   // Actions
-  createListing: (data: Omit<Listing, 'id' | 'created_at' | 'updated_at' | 'status'>) => Listing;
-  updateListingStatus: (id: string, status: Listing['status']) => void;
-  deleteListing: (id: string) => void;
+  createListing: (data: Omit<Listing, 'id' | 'created_at' | 'updated_at' | 'status'>) => Promise<Listing> | Listing;
+  updateListingStatus: (id: string, status: Listing['status']) => Promise<void> | void;
+  deleteListing: (id: string) => Promise<void> | void;
 
   expressInterest: (listingId: string, message?: string) => Interest;
   acceptInterest: (interestId: string) => void;
   declineInterest: (interestId: string) => void;
 
   planHandover: (listingId: string, interestId: string, date: string, time: string, location: string, note?: string) => Handover;
-  completeExchange: (listingId: string) => void;
+  completeExchange: (listingId: string) => Promise<void> | void;
 
   sendMessage: (interestId: string, recipientId: string, content: string, listingId?: string) => Promise<Message>;
   markConversationRead: (interestId: string) => Promise<void>;
@@ -98,6 +100,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setFeedbacks(dbService.getFeedbacks());
     setMessages(dbService.getMessages());
 
+    // Asynchronously fetch fresh persistent listings from Supabase
+    listingService.fetchListings().then((fetched) => {
+      if (fetched && fetched.length > 0) {
+        setListings(fetched);
+      }
+    }).catch(console.warn);
+
     if (currentUser) {
       setSavedListings(dbService.getSavedListings(currentUser.id));
       setSavedKnowledge(dbService.getSavedKnowledge(currentUser.id));
@@ -116,9 +125,85 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     refreshData();
 
+    // 1. Listen for local database storage changes
     const handleDbChange = () => refreshData();
     window.addEventListener('passon_db_change', handleDbChange);
-    return () => window.removeEventListener('passon_db_change', handleDbChange);
+
+    // 2. Cross-tab browser broadcast channel for zero-latency multi-tab sync
+    let bc: BroadcastChannel | null = null;
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      try {
+        bc = new BroadcastChannel('passon_listings_sync');
+        bc.onmessage = (event) => {
+          const { type, payload } = event.data || {};
+          if (type === 'INSERT' && payload) {
+            setListings((prev) => {
+              if (prev.some((l) => l.id === payload.id)) return prev;
+              return [payload, ...prev];
+            });
+          } else if (type === 'UPDATE' && payload) {
+            setListings((prev) =>
+              prev.map((l) => (l.id === payload.id ? { ...l, ...payload } : l))
+            );
+          } else if (type === 'DELETE' && payload) {
+            setListings((prev) => prev.filter((l) => l.id !== payload.id));
+          }
+        };
+      } catch (e) {
+        console.warn('[AppContext] BroadcastChannel error:', e);
+      }
+    }
+
+    // 3. Supabase Realtime channel for cross-browser & backend database events
+    let supabaseChannel: any = null;
+    if (isSupabaseConfigured) {
+      try {
+        supabaseChannel = supabase
+          .channel('passon_listings_realtime')
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'listings' },
+            (payload: any) => {
+              console.log('[AppContext] Realtime postgres_changes event:', payload);
+              if (payload.eventType === 'INSERT') {
+                listingService.fetchListings().then(setListings).catch(console.warn);
+              } else if (payload.eventType === 'UPDATE') {
+                setListings((prev) =>
+                  prev.map((l) => (l.id === payload.new.id ? { ...l, ...payload.new } : l))
+                );
+              } else if (payload.eventType === 'DELETE') {
+                setListings((prev) => prev.filter((l) => l.id !== payload.old.id));
+              }
+            }
+          )
+          .on('broadcast', { event: 'listing_changed' }, (msg: any) => {
+            const { type, payload } = msg.payload || {};
+            if (type === 'INSERT' && payload) {
+              setListings((prev) => {
+                if (prev.some((l) => l.id === payload.id)) return prev;
+                return [payload, ...prev];
+              });
+            } else if (type === 'UPDATE' && payload) {
+              setListings((prev) =>
+                prev.map((l) => (l.id === payload.id ? { ...l, ...payload } : l))
+              );
+            } else if (type === 'DELETE' && payload) {
+              setListings((prev) => prev.filter((l) => l.id !== payload.id));
+            }
+          })
+          .subscribe();
+      } catch (err) {
+        console.warn('[AppContext] Supabase Realtime subscribe note:', err);
+      }
+    }
+
+    return () => {
+      window.removeEventListener('passon_db_change', handleDbChange);
+      if (bc) bc.close();
+      if (supabaseChannel && isSupabaseConfigured) {
+        supabase.removeChannel(supabaseChannel);
+      }
+    };
   }, [refreshData]);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
@@ -133,22 +218,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  const createListing = (data: Omit<Listing, 'id' | 'created_at' | 'updated_at' | 'status'>) => {
-    const newListing = dbService.createListing(data);
+  const createListing = async (data: Omit<Listing, 'id' | 'created_at' | 'updated_at' | 'status'>) => {
+    const newListing = await listingService.createListing(data);
+    setListings((prev) => [newListing, ...prev.filter((l) => l.id !== newListing.id)]);
     refreshData();
     showToast('Your item is now live on PassOn!', 'success');
     return newListing;
   };
 
-  const updateListingStatus = (id: string, status: Listing['status']) => {
-    dbService.updateListingStatus(id, status);
-    refreshData();
+  const updateListingStatus = async (id: string, status: Listing['status']) => {
+    try {
+      const updated = await listingService.updateListingStatus(id, status, currentUser?.id);
+      setListings((prev) => prev.map((l) => (l.id === id ? updated : l)));
+      refreshData();
+    } catch (err: any) {
+      showToast(err.message || 'Failed to update listing status.', 'error');
+    }
   };
 
-  const deleteListing = (id: string) => {
-    dbService.deleteListing(id);
-    refreshData();
-    showToast('Listing removed successfully.', 'info');
+  const deleteListing = async (id: string) => {
+    try {
+      await listingService.deleteListing(id, currentUser?.id);
+      setListings((prev) => prev.filter((l) => l.id !== id));
+      refreshData();
+      showToast('Listing removed successfully.', 'info');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to delete listing.', 'error');
+    }
   };
 
   const expressInterest = (listingId: string, message?: string) => {
@@ -178,10 +274,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return handover;
   };
 
-  const completeExchange = (listingId: string) => {
-    dbService.completeHandover(listingId);
-    refreshData();
-    showToast('Exchange marked as completed!', 'success');
+  const completeExchange = async (listingId: string) => {
+    const listing = listings.find((l) => l.id === listingId) || dbService.getListingById(listingId);
+    if (!listing) {
+      showToast('Listing not found.', 'error');
+      return;
+    }
+
+    // Owner-only restriction: verify authenticated user against listing owner ID
+    if (!currentUser || listing.owner_id !== currentUser.id) {
+      showToast('Unauthorized: Only the listing owner can mark it as complete.', 'error');
+      throw new Error('Unauthorized: Only the listing owner can mark it as complete.');
+    }
+
+    try {
+      dbService.completeHandover(listingId, currentUser.id);
+      await listingService.updateListingStatus(listingId, 'COMPLETED', currentUser.id);
+      refreshData();
+      showToast('Exchange marked as completed!', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to mark exchange as complete.', 'error');
+      throw err;
+    }
   };
 
   const createLookingFor = (data: Omit<LookingFor, 'id' | 'created_at' | 'updated_at' | 'status'>) => {

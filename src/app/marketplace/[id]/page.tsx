@@ -184,16 +184,42 @@ export default function ListingDetailPage() {
           <div className="space-y-3">
             {!isOwner && (
               <>
-                {listing.status === 'AVAILABLE' || listing.status === 'INTERESTED' ? (
-                  userInterest ? (
-                    <div className="w-full bg-sky-50 border border-sky-200 text-sky-900 p-4 rounded-2xl text-center text-xs font-bold space-y-1">
-                      <div className="flex items-center justify-center gap-2 text-sm">
-                        <CheckCircle2 className="w-4 h-4 text-sky-600" /> Interest Sent!
-                      </div>
-                      <p className="text-stone-500 font-normal">
-                        Your interest message has been delivered. The owner will review and accept.
-                      </p>
+                {userInterest?.status?.toUpperCase() === 'DECLINED' ? (
+                  <div className="w-full bg-rose-50 border border-rose-200 text-rose-900 p-4 rounded-2xl text-center text-xs font-bold space-y-1">
+                    <div className="flex items-center justify-center gap-2 text-sm text-rose-700">
+                      <X className="w-4 h-4 text-rose-600" /> Request Declined
                     </div>
+                    <p className="text-rose-600 font-normal">
+                      The owner has declined this request.
+                    </p>
+                  </div>
+                ) : listing.status === 'AVAILABLE' || listing.status === 'INTERESTED' ? (
+                  userInterest ? (
+                    userInterest.status?.toUpperCase() === 'ACCEPTED' ? (
+                      <div className="w-full bg-emerald-50 border border-emerald-200 text-emerald-900 p-4 rounded-2xl text-center text-xs font-bold space-y-1">
+                        <div className="flex items-center justify-center gap-2 text-sm text-emerald-700">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Interest Accepted!
+                        </div>
+                        <p className="text-emerald-700 font-normal">
+                          The owner accepted your request. Check Matches to plan handover!
+                        </p>
+                        <Link
+                          href={`/matches?conversation=${userInterest.id}`}
+                          className="inline-block mt-2 bg-emerald-600 text-white px-3 py-1.5 rounded-xl font-bold text-xs hover:bg-emerald-700 transition-colors"
+                        >
+                          Open Conversation
+                        </Link>
+                      </div>
+                    ) : (
+                      <div className="w-full bg-sky-50 border border-sky-200 text-sky-900 p-4 rounded-2xl text-center text-xs font-bold space-y-1">
+                        <div className="flex items-center justify-center gap-2 text-sm">
+                          <CheckCircle2 className="w-4 h-4 text-sky-600" /> Interest Sent!
+                        </div>
+                        <p className="text-stone-500 font-normal">
+                          Your interest message has been delivered. The owner will review and accept.
+                        </p>
+                      </div>
+                    )
                   ) : (
                     <button
                       onClick={() => {

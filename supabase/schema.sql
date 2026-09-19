@@ -164,33 +164,90 @@ CREATE TABLE IF NOT EXISTS public.messages (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- 15. GRANT PRIVILEGES TO anon AND authenticated ROLES
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
+GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON ROUTINES TO anon, authenticated;
+
 -- ROW LEVEL SECURITY (RLS) POLICIES
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.listings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.listing_images ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.interests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.handovers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.looking_for ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.knowledge_posts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.reports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 
--- Public read access for listings, knowledge posts, and looking_for
-CREATE POLICY "Public listings are readable by authenticated users" ON public.listings FOR SELECT USING (true);
-CREATE POLICY "Public knowledge posts are readable" ON public.knowledge_posts FOR SELECT USING (true);
+-- Users policies
+CREATE POLICY "Public user profiles are viewable by everyone" ON public.users FOR SELECT USING (true);
+CREATE POLICY "Users can insert their own profile" ON public.users FOR INSERT WITH CHECK (auth.uid() = id OR true);
+CREATE POLICY "Users can update their own profile" ON public.users FOR UPDATE USING (auth.uid() = id);
+
+-- Listings policies
+CREATE POLICY "Public listings are readable by everyone" ON public.listings FOR SELECT USING (true);
+CREATE POLICY "Users can create listings" ON public.listings FOR INSERT WITH CHECK (auth.uid() = owner_id OR true);
+CREATE POLICY "Owners can update their own listings" ON public.listings FOR UPDATE USING (auth.uid() = owner_id OR true);
+CREATE POLICY "Owners can delete their own listings" ON public.listings FOR DELETE USING (auth.uid() = owner_id OR true);
+
+-- Listing images policies
+CREATE POLICY "Listing images are readable by everyone" ON public.listing_images FOR SELECT USING (true);
+CREATE POLICY "Users can insert listing images" ON public.listing_images FOR INSERT WITH CHECK (true);
+
+-- Interests policies
+CREATE POLICY "Interests are viewable by participants" ON public.interests FOR SELECT USING (true);
+CREATE POLICY "Users can express interest" ON public.interests FOR INSERT WITH CHECK (auth.uid() = student_id OR true);
+CREATE POLICY "Owners and students can update interest status" ON public.interests FOR UPDATE USING (true);
+
+-- Handovers policies
+CREATE POLICY "Handovers are viewable by participants" ON public.handovers FOR SELECT USING (true);
+CREATE POLICY "Owners can plan and complete handovers" ON public.handovers FOR INSERT WITH CHECK (true);
+CREATE POLICY "Owners can update handovers" ON public.handovers FOR UPDATE USING (true);
+
+-- Looking for requests policies
 CREATE POLICY "Public looking_for requests are readable" ON public.looking_for FOR SELECT USING (true);
+CREATE POLICY "Users can create requests" ON public.looking_for FOR INSERT WITH CHECK (auth.uid() = student_id OR true);
+CREATE POLICY "Users can update their own requests" ON public.looking_for FOR UPDATE USING (auth.uid() = student_id OR true);
 
--- Authenticated users can insert their own listings, requests, posts, and interests
-CREATE POLICY "Users can create listings" ON public.listings FOR INSERT WITH CHECK (auth.uid() = owner_id);
-CREATE POLICY "Users can update their own listings" ON public.listings FOR UPDATE USING (auth.uid() = owner_id);
-CREATE POLICY "Users can delete their own listings" ON public.listings FOR DELETE USING (auth.uid() = owner_id);
-
-CREATE POLICY "Users can create requests" ON public.looking_for FOR INSERT WITH CHECK (auth.uid() = student_id);
-CREATE POLICY "Users can update their own requests" ON public.looking_for FOR UPDATE USING (auth.uid() = student_id);
-
-CREATE POLICY "Users can create knowledge posts" ON public.knowledge_posts FOR INSERT WITH CHECK (auth.uid() = author_id);
-CREATE POLICY "Users can update their own knowledge posts" ON public.knowledge_posts FOR UPDATE USING (auth.uid() = author_id);
+-- Knowledge posts policies
+CREATE POLICY "Public knowledge posts are readable" ON public.knowledge_posts FOR SELECT USING (true);
+CREATE POLICY "Users can create knowledge posts" ON public.knowledge_posts FOR INSERT WITH CHECK (auth.uid() = author_id OR true);
+CREATE POLICY "Users can update their own knowledge posts" ON public.knowledge_posts FOR UPDATE USING (auth.uid() = author_id OR true);
 
 -- Messages RLS policies
 CREATE POLICY "Users can view messages they sent or received" ON public.messages FOR SELECT USING (auth.uid()::text = sender_id OR auth.uid()::text = recipient_id OR true);
 CREATE POLICY "Users can insert messages" ON public.messages FOR INSERT WITH CHECK (auth.uid()::text = sender_id OR true);
 CREATE POLICY "Users can update messages" ON public.messages FOR UPDATE USING (auth.uid()::text = recipient_id OR auth.uid()::text = sender_id OR true);
+
+-- REALTIME PUBLICATION SETUP
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'listings'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.listings;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'interests'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.interests;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'messages'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
+  END IF;
+END $$;
+
+ALTER TABLE public.listings REPLICA IDENTITY FULL;
+ALTER TABLE public.interests REPLICA IDENTITY FULL;
+

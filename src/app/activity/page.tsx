@@ -363,7 +363,7 @@ function ActivityContent() {
       case 'COMPLETED':
         return <span className="bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-0.5 rounded-full text-[10px] font-bold">Completed</span>;
       case 'DECLINED':
-        return <span className="bg-rose-50 text-rose-700 border border-rose-200 px-2.5 py-0.5 rounded-full text-[10px] font-bold">Declined</span>;
+        return <span className="bg-rose-50 text-rose-700 border border-rose-200 px-2.5 py-0.5 rounded-full text-[10px] font-bold">Request Declined</span>;
       case 'MATCHED':
         return <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full text-[10px] font-bold">Match Found</span>;
       case 'MESSAGE':
