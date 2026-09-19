@@ -36,7 +36,7 @@ interface AppContextType {
   removeToast: (id: string) => void;
 
   // Actions
-  createListing: (data: Omit<Listing, 'id' | 'created_at' | 'updated_at' | 'status'>) => Promise<Listing> | Listing;
+  createListing: (data: Omit<Listing, 'id' | 'created_at' | 'updated_at' | 'status'> & { id?: string }) => Promise<Listing> | Listing;
   updateListing: (id: string, data: Partial<Listing>) => Promise<Listing | void>;
   updateListingStatus: (id: string, status: Listing['status']) => Promise<void> | void;
   deleteListing: (id: string) => Promise<void> | void;

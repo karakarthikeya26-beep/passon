@@ -44,14 +44,15 @@ export const validateImageFile = (file: File): ValidationResult => {
 
 /**
  * Uploads an image file to Supabase Storage under the listing-images bucket
- * Organizes files into: listings/{userId}/{listingId}/{timestamp}_{uuid}_{filename}
+ * Enforces path structure: {userId}/{listingId}/{timestamp}_{uuid}.{ext}
+ * so that the first path segment strictly matches auth.uid() for Storage RLS policy enforcement.
  */
 export const uploadListingImage = async (
   file: File,
   userId: string,
   listingId?: string
 ): Promise<{ publicUrl: string; path: string }> => {
-  // Validate first
+  // 1. Validate file format and size limit (5MB)
   const validation = validateImageFile(file);
   if (!validation.valid) {
     throw new Error(validation.error || 'Invalid image file.');
@@ -61,13 +62,27 @@ export const uploadListingImage = async (
     throw new Error('Supabase is not configured. Please check your environment variables.');
   }
 
-  // Sanitize file name
+  // 2. Resolve authenticated user ID from Supabase Auth session if available
+  let authenticatedUserId = userId;
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user?.id) {
+      authenticatedUserId = user.id;
+    }
+  } catch (err) {
+    console.warn('[storage] Note retrieving session user:', err);
+  }
+
+  // 3. Ensure listing ID exists so path is strictly {userId}/{listingId}/{filename}
+  const targetListingId = listingId || generateUUID();
   const cleanExt = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
   const timestamp = Date.now();
   const uniqueId = generateUUID().substring(0, 8);
-  const folder = listingId ? `${userId}/${listingId}` : `${userId}/drafts`;
-  const filePath = `${folder}/${timestamp}_${uniqueId}.${cleanExt}`;
 
+  // Secure path format: {userId}/{listingId}/{uniqueFileName}
+  const filePath = `${authenticatedUserId}/${targetListingId}/${timestamp}_${uniqueId}.${cleanExt}`;
+
+  // 4. Perform upload into 'listing-images' bucket
   const { data, error } = await supabase.storage
     .from(STORAGE_BUCKET)
     .upload(filePath, file, {
@@ -77,14 +92,21 @@ export const uploadListingImage = async (
     });
 
   if (error) {
-    console.error('[storage] Upload error details:', error);
-    if (error.message.includes('bucket') || error.message.includes('not found') || error.message.includes('violates row-level security')) {
-      throw new Error(`Upload failed: Storage bucket or permission issue (${error.message}). Please ensure 'listing-images' bucket is created in Supabase.`);
+    console.error('[storage] Supabase Storage upload error:', error);
+    if (error.message.includes('row-level security') || (error as any).statusCode === '403') {
+      throw new Error(
+        `Storage permission denied (${error.message}). Please ensure the 'listing-images' bucket and RLS policies in 'supabase/storage_setup.sql' are applied in Supabase, and you are signed in.`
+      );
+    }
+    if (error.message.includes('bucket') || error.message.includes('not found')) {
+      throw new Error(
+        `Storage bucket 'listing-images' not found. Please run the SQL in 'supabase/storage_setup.sql' in your Supabase SQL Editor to create the bucket.`
+      );
     }
     throw new Error(`Upload failed: ${error.message}`);
   }
 
-  // Retrieve public URL
+  // 5. Retrieve public accessible URL
   const { data: publicUrlData } = supabase.storage
     .from(STORAGE_BUCKET)
     .getPublicUrl(data.path);

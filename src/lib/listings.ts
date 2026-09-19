@@ -136,9 +136,9 @@ export const listingService = {
    * Create a new listing in Supabase and local cache
    */
   createListing: async (
-    data: Omit<Listing, 'id' | 'created_at' | 'updated_at' | 'status'>
+    data: Omit<Listing, 'id' | 'created_at' | 'updated_at' | 'status'> & { id?: string }
   ): Promise<Listing> => {
-    const listingId = generateUUID();
+    const listingId = data.id || generateUUID();
     const now = new Date().toISOString();
 
     const newListing: Listing = {
@@ -153,6 +153,7 @@ export const listingService = {
     // 1. Immediately store in local database service
     const localCreated = dbService.createListing({
       ...data,
+      id: listingId,
       owner_id: data.owner_id,
     });
     // Ensure ID matches generated UUID

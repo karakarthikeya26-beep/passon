@@ -150,11 +150,11 @@ export const dbService = {
     const listings = dbService.getListings();
     return listings.find((l) => l.id === id);
   },
-  createListing: (newListing: Omit<Listing, 'id' | 'created_at' | 'updated_at' | 'status'>): Listing => {
+  createListing: (newListing: Omit<Listing, 'id' | 'created_at' | 'updated_at' | 'status'> & { id?: string }): Listing => {
     const listings = getStored<Listing[]>(STORAGE_KEYS.LISTINGS, []);
     const listing: Listing = {
       ...newListing,
-      id: generateUUID(),
+      id: newListing.id || generateUUID(),
       status: 'AVAILABLE',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),

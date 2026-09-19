@@ -272,62 +272,60 @@ ON CONFLICT (id) DO UPDATE SET
 -- Enable RLS on storage.objects
 ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 
--- 2. Storage RLS Policies for listing-images
+-- Grant basic privileges so roles can evaluate RLS
+GRANT ALL ON storage.buckets TO postgres, service_role, authenticated;
+GRANT SELECT ON storage.buckets TO anon;
+GRANT ALL ON storage.objects TO postgres, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON storage.objects TO authenticated;
+GRANT SELECT ON storage.objects TO anon;
 
--- Public view access: Anyone can view product photos for listings
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname = 'Public Access to Listing Images'
-  ) THEN
-    CREATE POLICY "Public Access to Listing Images"
-    ON storage.objects FOR SELECT
-    USING (bucket_id = 'listing-images');
-  END IF;
-END $$;
+-- Clean up any existing policies on listing-images to avoid conflicts
+DROP POLICY IF EXISTS "Public read access to listing images" ON storage.objects;
+DROP POLICY IF EXISTS "Public Access to Listing Images" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated users can upload listing images to own folder" ON storage.objects;
+DROP POLICY IF EXISTS "Users can upload listing images" ON storage.objects;
+DROP POLICY IF EXISTS "Users can update their own listing images" ON storage.objects;
+DROP POLICY IF EXISTS "Users can update their listing images" ON storage.objects;
+DROP POLICY IF EXISTS "Users can delete their own listing images" ON storage.objects;
+DROP POLICY IF EXISTS "Users can delete their listing images" ON storage.objects;
 
--- Upload policy: Authenticated students can upload product photos
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname = 'Users can upload listing images'
-  ) THEN
-    CREATE POLICY "Users can upload listing images"
-    ON storage.objects FOR INSERT
-    WITH CHECK (
-      bucket_id = 'listing-images'
-      AND (auth.role() = 'authenticated' OR auth.role() = 'anon')
-    );
-  END IF;
-END $$;
+-- SELECT Policy: Anyone (authenticated students and public users) can view listing images
+CREATE POLICY "Public read access to listing images"
+ON storage.objects FOR SELECT
+USING (
+    bucket_id = 'listing-images'
+);
 
--- Update policy: Owners can update their product photos
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname = 'Users can update their listing images'
-  ) THEN
-    CREATE POLICY "Users can update their listing images"
-    ON storage.objects FOR UPDATE
-    USING (
-      bucket_id = 'listing-images'
-      AND (auth.uid() = owner OR auth.role() = 'anon')
-    );
-  END IF;
-END $$;
+-- INSERT Policy: Authenticated users can upload strictly to their own user folder:
+-- Path format: {user_id}/{listing_id}/{filename} -> (storage.foldername(name))[1] = auth.uid()::text
+CREATE POLICY "Authenticated users can upload listing images to own folder"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (
+    bucket_id = 'listing-images'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+);
 
--- Delete policy: Owners can delete/clean up their product photos
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname = 'Users can delete their listing images'
-  ) THEN
-    CREATE POLICY "Users can delete their listing images"
-    ON storage.objects FOR DELETE
-    USING (
-      bucket_id = 'listing-images'
-      AND (auth.uid() = owner OR auth.role() = 'anon')
-    );
-  END IF;
-END $$;
+-- UPDATE Policy: Authenticated owners can update files strictly within their own user folder
+CREATE POLICY "Users can update their own listing images"
+ON storage.objects FOR UPDATE
+TO authenticated
+USING (
+    bucket_id = 'listing-images'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+)
+WITH CHECK (
+    bucket_id = 'listing-images'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+);
+
+-- DELETE Policy: Authenticated owners can delete files strictly within their own user folder
+CREATE POLICY "Users can delete their own listing images"
+ON storage.objects FOR DELETE
+TO authenticated
+USING (
+    bucket_id = 'listing-images'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+);
+
 

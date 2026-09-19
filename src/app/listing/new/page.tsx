@@ -9,6 +9,7 @@ import { PlusCircle, ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { ImageUpload, SelectedImageItem } from '../../../components/image-upload';
 import { uploadListingImage } from '../../../lib/storage';
+import { generateUUID } from '../../../lib/supabase';
 
 export default function CreateListingPage() {
   const router = useRouter();
@@ -69,18 +70,19 @@ export default function CreateListingPage() {
       return;
     }
 
+    const listingId = generateUUID();
     setErrorMessage(null);
     setIsUploading(true);
 
     try {
       const finalImageUrls: string[] = [];
 
-      // Upload each file to Supabase Storage
+      // Upload each file to Supabase Storage under {userId}/{listingId}/{filename}
       for (let i = 0; i < selectedImages.length; i++) {
         const item = selectedImages[i];
         if (item.file) {
           setUploadStatus(`Uploading photo ${i + 1} of ${selectedImages.length} to Supabase Storage...`);
-          const result = await uploadListingImage(item.file, currentUser.id);
+          const result = await uploadListingImage(item.file, currentUser.id, listingId);
           finalImageUrls.push(result.publicUrl);
         } else if (item.previewUrl) {
           // Preset image or existing URL
@@ -93,6 +95,7 @@ export default function CreateListingPage() {
       const finalPrice = mode === 'Donate' || mode === 'Hand Over' ? 0 : price;
 
       await createListing({
+        id: listingId,
         owner_id: currentUser.id,
         title: title.trim(),
         category,

@@ -94,6 +94,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const storedUsers = dbService.getUsers();
           const matched = storedUsers.find((u) => u.email.toLowerCase() === userEmail);
           if (matched) {
+            if (matched.id !== session.user.id) {
+              matched.id = session.user.id;
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('passon_users', JSON.stringify(storedUsers));
+              }
+            }
             setCurrentUser(matched);
             dbService.setCurrentUserId(matched.id);
           } else {
@@ -164,6 +170,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const existingUser = allUsers.find((u) => u.email.toLowerCase() === cleanEmail);
 
           if (existingUser) {
+            if (existingUser.id !== data.user.id) {
+              existingUser.id = data.user.id;
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('passon_users', JSON.stringify(allUsers));
+              }
+            }
             setCurrentUser(existingUser);
             dbService.setCurrentUserId(existingUser.id);
             setUsers(allUsers);
