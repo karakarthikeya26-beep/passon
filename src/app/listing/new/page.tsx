@@ -5,8 +5,10 @@ import { useRouter } from 'next/navigation';
 import { useApp } from '../../../context/AppContext';
 import { useAuth } from '../../../context/AuthContext';
 import { Category, Condition, ExchangeMode } from '../../../types';
-import { PlusCircle, Image as ImageIcon, X, ArrowLeft } from 'lucide-react';
+import { PlusCircle, ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
+import { ImageUpload, SelectedImageItem } from '../../../components/image-upload';
+import { uploadListingImage } from '../../../lib/storage';
 
 export default function CreateListingPage() {
   const router = useRouter();
@@ -20,8 +22,14 @@ export default function CreateListingPage() {
   const [price, setPrice] = useState<number>(500);
   const [exchangePreference, setExchangePreference] = useState('');
   const [description, setDescription] = useState('');
-  const [images, setImages] = useState<string[]>([]);
-  const [newImageUrl, setNewImageUrl] = useState('');
+  
+  // Selected images state from ImageUpload
+  const [selectedImages, setSelectedImages] = useState<SelectedImageItem[]>([]);
+  
+  // Upload and submission state
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState('');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const categories: Category[] = [
     'Academic',
@@ -37,53 +45,72 @@ export default function CreateListingPage() {
   const conditions: Condition[] = ['New', 'Like New', 'Good', 'Fair'];
   const modes: ExchangeMode[] = ['Sell', 'Exchange', 'Donate', 'Hand Over'];
 
-  const sampleImagePresets = [
-    'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=800', // Study & Reference Material
-    'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800', // Academic Gear
-    'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800', // Engineering Equipment
-  ];
-
-  const handleAddPresetImage = (url: string) => {
-    if (!images.includes(url)) {
-      setImages([...images, url]);
-    }
-  };
-
-  const handleAddCustomImage = () => {
-    if (newImageUrl.trim() && !images.includes(newImageUrl.trim())) {
-      setImages([...images, newImageUrl.trim()]);
-      setNewImageUrl('');
-    }
-  };
-
-  const handleRemoveImage = (index: number) => {
-    setImages(images.filter((_, i) => i !== index));
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isUploading) return;
+
     if (!currentUser) {
       router.push('/login');
       return;
     }
 
-    if (!title.trim() || !description.trim()) return;
+    if (!title.trim()) {
+      setErrorMessage('Please enter an item title.');
+      return;
+    }
 
-    const finalPrice = mode === 'Donate' || mode === 'Hand Over' ? 0 : price;
+    if (!description.trim()) {
+      setErrorMessage('Please provide a description of the item.');
+      return;
+    }
 
-    createListing({
-      owner_id: currentUser.id,
-      title: title.trim(),
-      category,
-      condition,
-      mode,
-      price: finalPrice,
-      exchange_preference: exchangePreference.trim(),
-      description: description.trim(),
-      images: images.length > 0 ? images : [sampleImagePresets[0]],
-    });
+    if (selectedImages.length === 0) {
+      setErrorMessage('Please upload or select at least one photo for your listing.');
+      return;
+    }
 
-    router.push('/marketplace');
+    setErrorMessage(null);
+    setIsUploading(true);
+
+    try {
+      const finalImageUrls: string[] = [];
+
+      // Upload each file to Supabase Storage
+      for (let i = 0; i < selectedImages.length; i++) {
+        const item = selectedImages[i];
+        if (item.file) {
+          setUploadStatus(`Uploading photo ${i + 1} of ${selectedImages.length} to Supabase Storage...`);
+          const result = await uploadListingImage(item.file, currentUser.id);
+          finalImageUrls.push(result.publicUrl);
+        } else if (item.previewUrl) {
+          // Preset image or existing URL
+          finalImageUrls.push(item.previewUrl);
+        }
+      }
+
+      setUploadStatus('Publishing listing to PassOn...');
+
+      const finalPrice = mode === 'Donate' || mode === 'Hand Over' ? 0 : price;
+
+      await createListing({
+        owner_id: currentUser.id,
+        title: title.trim(),
+        category,
+        condition,
+        mode,
+        price: finalPrice,
+        exchange_preference: exchangePreference.trim(),
+        description: description.trim(),
+        images: finalImageUrls,
+      });
+
+      router.push('/marketplace');
+    } catch (err: any) {
+      console.error('[CreateListing] Submission error:', err);
+      setErrorMessage(err.message || 'Failed to upload photo or create listing. Please try again.');
+      setIsUploading(false);
+      setUploadStatus('');
+    }
   };
 
   return (
@@ -107,6 +134,17 @@ export default function CreateListingPage() {
           </p>
         </div>
 
+        {/* Global Error Alert */}
+        {errorMessage && (
+          <div className="flex items-start gap-2.5 p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl text-xs font-semibold">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
+            <div className="space-y-1">
+              <p className="font-bold">Error creating listing</p>
+              <p className="font-normal text-rose-700">{errorMessage}</p>
+            </div>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Title */}
           <div>
@@ -116,9 +154,10 @@ export default function CreateListingPage() {
             <input
               type="text"
               value={title}
+              disabled={isUploading}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Casio Scientific Calculator FX-991EX"
-              className="w-full bg-stone-50 border border-stone-200 rounded-xl p-3.5 text-sm text-[#292524] placeholder-stone-400 focus:outline-none focus:border-[#E9784B] font-semibold"
+              className="w-full bg-stone-50 border border-stone-200 rounded-xl p-3.5 text-sm text-[#292524] placeholder-stone-400 focus:outline-none focus:border-[#E9784B] font-semibold disabled:opacity-60"
               required
             />
           </div>
@@ -129,8 +168,9 @@ export default function CreateListingPage() {
               <label className="block text-xs font-bold text-stone-700 mb-1.5">Category</label>
               <select
                 value={category}
+                disabled={isUploading}
                 onChange={(e) => setCategory(e.target.value as Category)}
-                className="w-full bg-stone-50 border border-stone-200 rounded-xl p-3 text-sm text-[#292524] focus:outline-none focus:border-[#E9784B] font-semibold"
+                className="w-full bg-stone-50 border border-stone-200 rounded-xl p-3 text-sm text-[#292524] focus:outline-none focus:border-[#E9784B] font-semibold disabled:opacity-60"
               >
                 {categories.map((c) => (
                   <option key={c} value={c}>
@@ -144,8 +184,9 @@ export default function CreateListingPage() {
               <label className="block text-xs font-bold text-stone-700 mb-1.5">Condition</label>
               <select
                 value={condition}
+                disabled={isUploading}
                 onChange={(e) => setCondition(e.target.value as Condition)}
-                className="w-full bg-stone-50 border border-stone-200 rounded-xl p-3 text-sm text-[#292524] focus:outline-none focus:border-[#E9784B] font-semibold"
+                className="w-full bg-stone-50 border border-stone-200 rounded-xl p-3 text-sm text-[#292524] focus:outline-none focus:border-[#E9784B] font-semibold disabled:opacity-60"
               >
                 {conditions.map((c) => (
                   <option key={c} value={c}>
@@ -165,12 +206,13 @@ export default function CreateListingPage() {
                   <button
                     key={m}
                     type="button"
+                    disabled={isUploading}
                     onClick={() => setMode(m)}
                     className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all ${
                       mode === m
                         ? 'bg-[#E9784B] text-white border-[#E9784B] shadow-xs'
                         : 'bg-stone-50 border-stone-200 text-stone-700 hover:bg-stone-100'
-                    }`}
+                    } disabled:opacity-60`}
                   >
                     {m}
                   </button>
@@ -187,9 +229,10 @@ export default function CreateListingPage() {
                 <input
                   type="number"
                   value={price}
+                  disabled={isUploading}
                   onChange={(e) => setPrice(Number(e.target.value))}
                   placeholder="e.g. 600"
-                  className="w-full bg-white border border-stone-200 rounded-xl p-3 text-sm text-[#292524] focus:outline-none focus:border-[#E9784B] font-semibold"
+                  className="w-full bg-white border border-stone-200 rounded-xl p-3 text-sm text-[#292524] focus:outline-none focus:border-[#E9784B] font-semibold disabled:opacity-60"
                   min={0}
                 />
                 <p className="text-[11px] text-stone-500 font-medium">
@@ -206,9 +249,10 @@ export default function CreateListingPage() {
                 <input
                   type="text"
                   value={exchangePreference}
+                  disabled={isUploading}
                   onChange={(e) => setExchangePreference(e.target.value)}
                   placeholder="e.g. Exchange for S5 CSE handbook or ₹600"
-                  className="w-full bg-white border border-stone-200 rounded-xl p-3 text-sm text-[#292524] focus:outline-none focus:border-[#E9784B] font-semibold"
+                  className="w-full bg-white border border-stone-200 rounded-xl p-3 text-sm text-[#292524] focus:outline-none focus:border-[#E9784B] font-semibold disabled:opacity-60"
                 />
               </div>
             )}
@@ -227,9 +271,10 @@ export default function CreateListingPage() {
                 <input
                   type="text"
                   value={exchangePreference}
+                  disabled={isUploading}
                   onChange={(e) => setExchangePreference(e.target.value)}
                   placeholder="e.g. Hand over near library entrance after 1:30 PM"
-                  className="w-full bg-white border border-stone-200 rounded-xl p-3 text-sm text-[#292524] focus:outline-none focus:border-[#E9784B] font-semibold"
+                  className="w-full bg-white border border-stone-200 rounded-xl p-3 text-sm text-[#292524] focus:outline-none focus:border-[#E9784B] font-semibold disabled:opacity-60"
                 />
               </div>
             )}
@@ -242,69 +287,26 @@ export default function CreateListingPage() {
             </label>
             <textarea
               value={description}
+              disabled={isUploading}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe condition, included accessories, usage history..."
               rows={4}
-              className="w-full bg-stone-50 border border-stone-200 rounded-xl p-3.5 text-sm text-[#292524] placeholder-stone-400 focus:outline-none focus:border-[#E9784B] font-medium"
+              className="w-full bg-stone-50 border border-stone-200 rounded-xl p-3.5 text-sm text-[#292524] placeholder-stone-400 focus:outline-none focus:border-[#E9784B] font-medium disabled:opacity-60"
               required
             />
           </div>
 
-          {/* Image Upload & Previews */}
-          <div className="space-y-3">
-            <label className="block text-xs font-bold text-stone-700">Item Images</label>
-
-            {/* Current Image Previews */}
-            <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
-              {images.map((img, idx) => (
-                <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-stone-200 group bg-stone-100">
-                  <img src={img} alt="" className="w-full h-full object-cover" />
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveImage(idx)}
-                    className="absolute top-1 right-1 bg-white/90 text-rose-600 p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity shadow-xs"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {/* Add Image Preset or Custom URL */}
-            <div className="bg-stone-50 p-4 rounded-2xl border border-stone-200 space-y-3">
-              <span className="text-xs text-stone-500 font-bold block">Select demo sample photo:</span>
-              <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                {sampleImagePresets.map((preset, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => handleAddPresetImage(preset)}
-                    className="w-14 h-14 rounded-lg overflow-hidden border border-stone-200 shrink-0 hover:scale-105 transition-transform"
-                  >
-                    <img src={preset} alt="" className="w-full h-full object-cover" />
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  type="url"
-                  value={newImageUrl}
-                  onChange={(e) => setNewImageUrl(e.target.value)}
-                  placeholder="Or paste image URL (https://...)"
-                  className="flex-1 bg-white border border-stone-200 rounded-xl p-2.5 text-xs text-[#292524] focus:outline-none font-medium"
-                />
-                <button
-                  type="button"
-                  onClick={handleAddCustomImage}
-                  className="bg-stone-200 hover:bg-stone-300 text-stone-800 px-3.5 py-2 rounded-xl text-xs font-bold"
-                >
-                  Add Photo
-                </button>
-              </div>
-            </div>
+          {/* Device Image Upload Component (Replaces old URL input) */}
+          <div className="pt-2">
+            <ImageUpload
+              images={selectedImages}
+              onChange={setSelectedImages}
+              disabled={isUploading}
+              maxImages={4}
+            />
           </div>
 
+          {/* Actions & Submit */}
           <div className="pt-4 border-t border-stone-200 flex items-center justify-end gap-3">
             <Link
               href="/marketplace"
@@ -314,10 +316,20 @@ export default function CreateListingPage() {
             </Link>
             <button
               type="submit"
-              className="flex items-center gap-2 bg-[#E9784B] hover:bg-[#d8673a] text-white font-bold px-6 py-3 rounded-[12px] text-xs shadow-xs transition-all hover:scale-102"
+              disabled={isUploading}
+              className="flex items-center gap-2 bg-[#E9784B] hover:bg-[#d8673a] text-white font-bold px-6 py-3 rounded-[12px] text-xs shadow-xs transition-all hover:scale-102 disabled:opacity-60 disabled:pointer-events-none cursor-pointer"
             >
-              <PlusCircle className="w-4 h-4" />
-              <span>Publish to PassOn</span>
+              {isUploading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>{uploadStatus || 'Processing...'}</span>
+                </>
+              ) : (
+                <>
+                  <PlusCircle className="w-4 h-4" />
+                  <span>Publish to PassOn</span>
+                </>
+              )}
             </button>
           </div>
         </form>

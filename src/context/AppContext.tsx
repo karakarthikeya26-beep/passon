@@ -37,6 +37,7 @@ interface AppContextType {
 
   // Actions
   createListing: (data: Omit<Listing, 'id' | 'created_at' | 'updated_at' | 'status'>) => Promise<Listing> | Listing;
+  updateListing: (id: string, data: Partial<Listing>) => Promise<Listing | void>;
   updateListingStatus: (id: string, status: Listing['status']) => Promise<void> | void;
   deleteListing: (id: string) => Promise<void> | void;
 
@@ -236,6 +237,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const updateListing = async (id: string, data: Partial<Listing>) => {
+    try {
+      const updated = await listingService.updateListing(id, data, currentUser?.id);
+      setListings((prev) => prev.map((l) => (l.id === id ? updated : l)));
+      refreshData();
+      showToast('Listing updated successfully.', 'success');
+      return updated;
+    } catch (err: any) {
+      showToast(err.message || 'Failed to update listing.', 'error');
+      throw err;
+    }
+  };
+
   const deleteListing = async (id: string) => {
     try {
       await listingService.deleteListing(id, currentUser?.id);
@@ -421,6 +435,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         showToast,
         removeToast,
         createListing,
+        updateListing,
         updateListingStatus,
         deleteListing,
         expressInterest,

@@ -1,6 +1,7 @@
 import { Listing } from '../types';
 import { supabase, isSupabaseConfigured, generateUUID } from './supabase';
 import { dbService } from './db';
+import { deleteListingImage } from './storage';
 
 const BROADCAST_CHANNEL_NAME = 'passon_listings_sync';
 
@@ -250,7 +251,86 @@ export const listingService = {
   },
 
   /**
-   * Delete a listing with owner authorization check
+   * Update listing details (including replacing photos) with owner authorization check
+   */
+  updateListing: async (
+    id: string,
+    updates: Partial<Listing>,
+    actorUserId?: string
+  ): Promise<Listing> => {
+    const listing = dbService.getListingById(id);
+    if (!listing) {
+      throw new Error('Listing not found');
+    }
+
+    if (actorUserId && listing.owner_id !== actorUserId) {
+      throw new Error('Unauthorized: Only the listing owner can edit this listing.');
+    }
+
+    // If images are being updated, check for removed images and clean up Supabase storage
+    if (updates.images && Array.isArray(updates.images)) {
+      const oldImages = listing.images || [];
+      const newImages = updates.images;
+      const removedImages = oldImages.filter((oldImg) => !newImages.includes(oldImg));
+
+      for (const removedImg of removedImages) {
+        await deleteListingImage(removedImg);
+      }
+    }
+
+    // 1. Update in local store
+    const updated = dbService.updateListing(id, updates);
+
+    // 2. Update in Supabase
+    if (isSupabaseConfigured) {
+      try {
+        const { images: newImages, owner: _owner, id: _id, created_at: _created, ...dbFields } = updates;
+        
+        if (Object.keys(dbFields).length > 0) {
+          const query = supabase
+            .from('listings')
+            .update({
+              ...dbFields,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', id);
+
+          if (actorUserId) {
+            query.eq('owner_id', actorUserId);
+          }
+          await query;
+        }
+
+        // If images were updated, update listing_images table
+        if (newImages && Array.isArray(newImages)) {
+          // Delete old image rows for this listing
+          await supabase.from('listing_images').delete().eq('listing_id', id);
+
+          // Insert new image rows
+          if (newImages.length > 0) {
+            const now = new Date().toISOString();
+            const imageRows = newImages.map((url) => ({
+              id: generateUUID(),
+              listing_id: id,
+              file_url: url,
+              created_at: now,
+            }));
+            await supabase.from('listing_images').insert(imageRows);
+          }
+        }
+      } catch (err) {
+        console.warn('[listingService] Supabase updateListing exception:', err);
+      }
+    }
+
+    // 3. Broadcast update
+    listingService.broadcastChange('UPDATE', updated);
+
+    return updated;
+  },
+
+  /**
+   * Delete a listing with owner authorization check and storage cleanup
    */
   deleteListing: async (id: string, actorUserId?: string): Promise<void> => {
     const listing = dbService.getListingById(id);
@@ -258,6 +338,13 @@ export const listingService = {
 
     if (actorUserId && listing.owner_id !== actorUserId) {
       throw new Error('Unauthorized: Only the listing owner can delete it.');
+    }
+
+    // Clean up associated images from Supabase Storage
+    if (listing.images && listing.images.length > 0) {
+      for (const img of listing.images) {
+        await deleteListingImage(img);
+      }
     }
 
     // 1. Delete from local store

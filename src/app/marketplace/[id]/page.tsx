@@ -10,9 +10,10 @@ import { InterestModal } from '../../../components/interest-modal';
 import { HandoverModal } from '../../../components/handover-modal';
 import { FeedbackModal } from '../../../components/feedback-modal';
 import { ReportModal } from '../../../components/report-modal';
+import { EditPhotoModal } from '../../../components/edit-photo-modal';
 import {
   Tag, Bookmark, MessageSquare, ShieldAlert, MapPin, CheckCircle2,
-  User, ArrowLeft, Trash2, Check, X
+  User, ArrowLeft, Trash2, Check, X, Camera
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -36,6 +37,7 @@ export default function ListingDetailPage() {
   const [selectedInterestForHandover, setSelectedInterestForHandover] = useState<string | null>(null);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [isEditPhotoModalOpen, setIsEditPhotoModalOpen] = useState(false);
 
   if (!listing) {
     return (
@@ -364,13 +366,20 @@ export default function ListingDetailPage() {
                   </div>
                 )}
 
-                <div className="pt-2 border-t border-stone-200">
+                <div className="pt-2 border-t border-stone-200 flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditPhotoModalOpen(true)}
+                    className="text-xs text-stone-700 hover:text-[#E9784B] flex items-center gap-1.5 font-bold py-1 px-2.5 rounded-lg bg-stone-100 hover:bg-stone-200 transition-colors"
+                  >
+                    <Camera className="w-3.5 h-3.5 text-[#E9784B]" /> Update Photos
+                  </button>
                   <button
                     onClick={() => {
                       deleteListing(listing.id);
                       router.push('/marketplace');
                     }}
-                    className="text-xs text-rose-600 hover:text-rose-800 flex items-center gap-1 font-semibold"
+                    className="text-xs text-rose-600 hover:text-rose-800 flex items-center gap-1 font-semibold py-1 px-2"
                   >
                     <Trash2 className="w-3.5 h-3.5" /> Delete Listing
                   </button>
@@ -404,6 +413,12 @@ export default function ListingDetailPage() {
           targetId={listing.id}
           targetTitle={listing.title}
           onClose={() => setIsReportModalOpen(false)}
+        />
+      )}
+      {isEditPhotoModalOpen && (
+        <EditPhotoModal
+          listing={listing}
+          onClose={() => setIsEditPhotoModalOpen(false)}
         />
       )}
     </div>

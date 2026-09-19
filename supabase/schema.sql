@@ -251,3 +251,83 @@ END $$;
 ALTER TABLE public.listings REPLICA IDENTITY FULL;
 ALTER TABLE public.interests REPLICA IDENTITY FULL;
 
+-- ==========================================================
+-- SUPABASE STORAGE: listing-images BUCKET & RLS POLICIES
+-- ==========================================================
+
+-- 1. Create or update the 'listing-images' storage bucket (Public, 5MB limit, allowed image MIME types)
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+    'listing-images',
+    'listing-images',
+    true,
+    5242880, -- 5 MB
+    ARRAY['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+)
+ON CONFLICT (id) DO UPDATE SET
+    public = true,
+    file_size_limit = 5242880,
+    allowed_mime_types = ARRAY['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+
+-- Enable RLS on storage.objects
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+
+-- 2. Storage RLS Policies for listing-images
+
+-- Public view access: Anyone can view product photos for listings
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname = 'Public Access to Listing Images'
+  ) THEN
+    CREATE POLICY "Public Access to Listing Images"
+    ON storage.objects FOR SELECT
+    USING (bucket_id = 'listing-images');
+  END IF;
+END $$;
+
+-- Upload policy: Authenticated students can upload product photos
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname = 'Users can upload listing images'
+  ) THEN
+    CREATE POLICY "Users can upload listing images"
+    ON storage.objects FOR INSERT
+    WITH CHECK (
+      bucket_id = 'listing-images'
+      AND (auth.role() = 'authenticated' OR auth.role() = 'anon')
+    );
+  END IF;
+END $$;
+
+-- Update policy: Owners can update their product photos
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname = 'Users can update their listing images'
+  ) THEN
+    CREATE POLICY "Users can update their listing images"
+    ON storage.objects FOR UPDATE
+    USING (
+      bucket_id = 'listing-images'
+      AND (auth.uid() = owner OR auth.role() = 'anon')
+    );
+  END IF;
+END $$;
+
+-- Delete policy: Owners can delete/clean up their product photos
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname = 'Users can delete their listing images'
+  ) THEN
+    CREATE POLICY "Users can delete their listing images"
+    ON storage.objects FOR DELETE
+    USING (
+      bucket_id = 'listing-images'
+      AND (auth.uid() = owner OR auth.role() = 'anon')
+    );
+  END IF;
+END $$;
+

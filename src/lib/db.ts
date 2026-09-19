@@ -172,6 +172,19 @@ export const dbService = {
     setStored(STORAGE_KEYS.LISTINGS, listings);
     return listings[index];
   },
+  updateListing: (id: string, updates: Partial<Listing>): Listing => {
+    const listings = getStored<Listing[]>(STORAGE_KEYS.LISTINGS, []);
+    const index = listings.findIndex((l) => l.id === id);
+    if (index === -1) throw new Error('Listing not found');
+    const updated = {
+      ...listings[index],
+      ...updates,
+      updated_at: new Date().toISOString(),
+    };
+    listings[index] = updated;
+    setStored(STORAGE_KEYS.LISTINGS, listings);
+    return updated;
+  },
   deleteListing: (id: string) => {
     const listings = getStored<Listing[]>(STORAGE_KEYS.LISTINGS, []);
     const filtered = listings.filter((l) => l.id !== id);
