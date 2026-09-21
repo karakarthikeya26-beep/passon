@@ -31,7 +31,7 @@ export default function CreateLookingForPage() {
 
   const modes: RequestMode[] = ['ANY', 'BUY', 'EXCHANGE', 'DONATE'];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) {
       router.push('/login');
@@ -40,7 +40,7 @@ export default function CreateLookingForPage() {
 
     if (!title.trim() || !description.trim()) return;
 
-    createLookingFor({
+    await createLookingFor({
       student_id: currentUser.id,
       title: title.trim(),
       category,

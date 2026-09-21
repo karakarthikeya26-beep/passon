@@ -13,7 +13,7 @@ import { Conversation, Message, Interest, Listing, User } from '../../types';
 import {
   Sparkles, MessageSquare, Send, Search, MapPin, CheckCircle2,
   Check, X, Clock, ArrowLeft, Tag, Info, AlertCircle, RefreshCw, UserCheck,
-  ChevronDown
+  ChevronDown, SearchCode
 } from 'lucide-react';
 
 function MatchesAndConversationsContent() {
@@ -110,13 +110,13 @@ function MatchesAndConversationsContent() {
   const conversations = useMemo((): Conversation[] => {
     if (!currentUser) return [];
 
-    // All interests where currentUser is the interested student OR the listing owner
+    // 1. All interests where currentUser is the interested student OR the listing owner
     const relevantInterests = interests.filter((interest) => {
       const listing = listings.find((l) => l.id === interest.listing_id);
       return interest.student_id === currentUser.id || (listing && listing.owner_id === currentUser.id);
     });
 
-    return relevantInterests.map((interest) => {
+    const listingConversations: Conversation[] = relevantInterests.map((interest) => {
       const listing = listings.find((l) => l.id === interest.listing_id) || {
         id: interest.listing_id,
         title: 'Item Listing',
@@ -174,7 +174,101 @@ function MatchesAndConversationsContent() {
         ) as any,
         updated_at: lastMessage?.created_at || interest.updated_at || interest.created_at,
       };
-    }).sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+    });
+
+    // 2. All Looking For offer conversations involving currentUser
+    const lookingForOfferThreads = new Map<string, Message[]>();
+    messages.forEach((m) => {
+      if (
+        m.interest_id?.startsWith('lf_') &&
+        (m.sender_id === currentUser.id || m.recipient_id === currentUser.id)
+      ) {
+        const list = lookingForOfferThreads.get(m.interest_id) || [];
+        list.push(m);
+        lookingForOfferThreads.set(m.interest_id, list);
+      }
+    });
+
+    const lookingForConversations: Conversation[] = Array.from(lookingForOfferThreads.entries()).map(
+      ([threadId, threadMessages]) => {
+        const sortedMsgs = [...threadMessages].sort(
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+        const parts = threadId.split('_');
+        const reqId = parts[1];
+        const offererId = parts[2];
+
+        const req = lookingFor.find((r) => r.id === reqId) || {
+          id: reqId,
+          title: 'Requested Item',
+          category: 'Other' as const,
+          mode: 'ANY' as const,
+          description: '',
+          student_id: offererId === currentUser.id ? '' : currentUser.id,
+          status: 'OPEN' as const,
+          created_at: sortedMsgs[0]?.created_at || new Date().toISOString(),
+          updated_at: sortedMsgs[sortedMsgs.length - 1]?.created_at || new Date().toISOString(),
+        };
+
+        const isOfferer = currentUser.id === offererId;
+        const otherUserId = isOfferer ? req.student_id : offererId;
+        const otherUser =
+          users.find((u) => u.id === otherUserId) ||
+          (isOfferer ? req.student : users.find((u) => u.id === offererId)) || {
+            id: otherUserId,
+            name: isOfferer ? 'Request Author' : 'Helpful Student',
+            email: '',
+            branch: 'VNR Student',
+            batch: '',
+            role: 'student' as const,
+            created_at: '',
+          };
+
+        const lastMessage = sortedMsgs[sortedMsgs.length - 1];
+        const unreadCount = sortedMsgs.filter(
+          (m) => m.recipient_id === currentUser.id && !m.read && !m.system_event
+        ).length;
+
+        const dummyListing: Listing = {
+          id: `lf-${req.id}`,
+          title: `Looking For: ${req.title}`,
+          owner_id: req.student_id,
+          category: req.category,
+          condition: 'Good',
+          mode: (req.mode === 'BUY' ? 'Sell' : req.mode === 'DONATE' ? 'Donate' : 'Exchange') as any,
+          description: req.description,
+          images: [],
+          status: 'AVAILABLE',
+          created_at: req.created_at,
+          updated_at: req.updated_at,
+        };
+
+        const dummyInterest: Interest = {
+          id: threadId,
+          listing_id: `lf-${req.id}`,
+          student_id: offererId,
+          message: sortedMsgs[0]?.content || '',
+          status: 'ACCEPTED',
+          created_at: sortedMsgs[0]?.created_at || new Date().toISOString(),
+          updated_at: lastMessage?.created_at || new Date().toISOString(),
+        };
+
+        return {
+          interest: dummyInterest,
+          listing: dummyListing,
+          lookingFor: req,
+          otherUser,
+          lastMessage,
+          unreadCount,
+          status: (req.status || 'OPEN') as any,
+          updated_at: lastMessage?.created_at || req.updated_at || req.created_at,
+        };
+      }
+    );
+
+    return [...listingConversations, ...lookingForConversations].sort(
+      (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+    );
   }, [currentUser, interests, listings, messages, users]);
 
   // Selected conversation object
@@ -485,10 +579,18 @@ function MatchesAndConversationsContent() {
 
                         {/* Item Title & Role Badge */}
                         <div className="flex items-center gap-1.5 text-[11px] text-stone-600 truncate mb-1">
-                          <span className="font-semibold text-stone-800 truncate">{conv.listing.title}</span>
+                          <span className="font-semibold text-stone-800 truncate">
+                            {conv.lookingFor ? `Looking For: ${conv.lookingFor.title}` : conv.listing.title}
+                          </span>
                           <span className="text-stone-300">•</span>
                           <span className="text-[9px] font-bold text-stone-500 uppercase tracking-wider">
-                            {isOwner ? 'Your Post' : 'Interested'}
+                            {conv.lookingFor
+                              ? conv.lookingFor.student_id === currentUser.id
+                                ? 'Your Request'
+                                : 'Offered Item'
+                              : isOwner
+                              ? 'Your Post'
+                              : 'Interested'}
                           </span>
                         </div>
 
@@ -546,8 +648,14 @@ function MatchesAndConversationsContent() {
                       <div>
                         <div className="font-extrabold text-sm text-stone-900 flex items-center gap-1.5">
                           {activeConversation.otherUser.name}
-                          <span className="text-[10px] font-bold text-stone-400 bg-stone-100 px-2 py-0.5 rounded-md">
-                            {isOwnerOfActive ? 'Interested Student' : 'Listing Owner'}
+                          <span className="text-[10px] font-bold text-stone-500 bg-stone-100 px-2 py-0.5 rounded-md">
+                            {activeConversation.lookingFor
+                              ? activeConversation.lookingFor.student_id === currentUser.id
+                                ? 'Offering Student'
+                                : 'Request Author'
+                              : isOwnerOfActive
+                              ? 'Interested Student'
+                              : 'Listing Owner'}
                           </span>
                         </div>
                         <div className="text-[11px] text-stone-500">
@@ -560,91 +668,127 @@ function MatchesAndConversationsContent() {
                   </div>
 
                   {/* Context Item Bar */}
-                  <div className="bg-stone-50 border border-stone-200/80 rounded-2xl p-2.5 flex items-center justify-between gap-3 text-xs">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      {activeConversation.listing.images?.[0] ? (
-                        <img
-                          src={activeConversation.listing.images[0]}
-                          alt=""
-                          className="w-10 h-10 rounded-xl object-cover border border-stone-200 shrink-0"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 rounded-xl bg-orange-100 border border-orange-200 flex items-center justify-center text-[#E9784B] font-bold text-xs shrink-0">
-                          📦
+                  {activeConversation.lookingFor ? (
+                    <div className="bg-sky-50/80 border border-sky-200/80 rounded-2xl p-2.5 flex items-center justify-between gap-3 text-xs">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-10 h-10 rounded-xl bg-sky-100 border border-sky-200 flex items-center justify-center text-sky-700 font-bold shrink-0">
+                          <SearchCode className="w-5 h-5" />
                         </div>
-                      )}
-                      <div className="min-w-0">
-                        <Link
-                          href={`/marketplace/${activeConversation.listing.id}`}
-                          className="font-bold text-stone-900 hover:text-[#E9784B] hover:underline truncate block"
-                        >
-                          {activeConversation.listing.title}
-                        </Link>
-                        <div className="text-[10px] text-stone-500">
-                          Mode: <span className="font-semibold text-stone-700">{activeConversation.listing.mode}</span> •
-                          Price: <span className="font-bold text-[#E9784B]">{activeConversation.listing.price ? `₹${activeConversation.listing.price}` : 'Free'}</span>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="bg-sky-100 text-sky-800 text-[10px] font-bold px-2 py-0.5 rounded-md">
+                              Looking For Request
+                            </span>
+                            <span className="text-[10px] text-stone-400">•</span>
+                            <span className="text-[10px] font-semibold text-stone-600">
+                              {activeConversation.lookingFor.category}
+                            </span>
+                          </div>
+                          <Link
+                            href="/looking-for"
+                            className="font-bold text-stone-900 hover:text-sky-700 hover:underline truncate block text-xs mt-0.5"
+                          >
+                            {activeConversation.lookingFor.title}
+                          </Link>
+                          <div className="text-[10px] text-stone-500 truncate">
+                            Preferred Mode: <span className="font-semibold text-stone-700">{activeConversation.lookingFor.mode}</span>
+                          </div>
                         </div>
                       </div>
+                      <Link
+                        href="/looking-for"
+                        className="bg-white hover:bg-stone-50 text-stone-700 border border-stone-200 font-bold text-xs px-3 py-1.5 rounded-xl shadow-xs transition-all shrink-0"
+                      >
+                        View Requests
+                      </Link>
                     </div>
-
-                    {/* Context Action CTAs based on status & role */}
-                    <div className="flex items-center gap-2 shrink-0">
-                      {isOwnerOfActive && activeConversation.interest.status === 'PENDING' && (
-                        <>
-                          <button
-                            onClick={() => acceptInterest(activeConversation.interest.id)}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-1.5 rounded-xl flex items-center gap-1 shadow-xs transition-all"
+                  ) : (
+                    <div className="bg-stone-50 border border-stone-200/80 rounded-2xl p-2.5 flex items-center justify-between gap-3 text-xs">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        {activeConversation.listing.images?.[0] ? (
+                          <img
+                            src={activeConversation.listing.images[0]}
+                            alt=""
+                            className="w-10 h-10 rounded-xl object-cover border border-stone-200 shrink-0"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-xl bg-orange-100 border border-orange-200 flex items-center justify-center text-[#E9784B] font-bold text-xs shrink-0">
+                            📦
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <Link
+                            href={`/marketplace/${activeConversation.listing.id}`}
+                            className="font-bold text-stone-900 hover:text-[#E9784B] hover:underline truncate block"
                           >
-                            <Check className="w-3.5 h-3.5" /> Accept
-                          </button>
+                            {activeConversation.listing.title}
+                          </Link>
+                          <div className="text-[10px] text-stone-500">
+                            Mode: <span className="font-semibold text-stone-700">{activeConversation.listing.mode}</span> •
+                            Price: <span className="font-bold text-[#E9784B]">{activeConversation.listing.price ? `₹${activeConversation.listing.price}` : 'Free'}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Context Action CTAs based on status & role */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        {isOwnerOfActive && activeConversation.interest.status === 'PENDING' && (
+                          <>
+                            <button
+                              onClick={() => acceptInterest(activeConversation.interest.id)}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-1.5 rounded-xl flex items-center gap-1 shadow-xs transition-all"
+                            >
+                              <Check className="w-3.5 h-3.5" /> Accept
+                            </button>
+                            <button
+                              onClick={() => declineInterest(activeConversation.interest.id)}
+                              className="bg-stone-200 hover:bg-rose-100 text-stone-700 hover:text-rose-700 font-semibold text-xs px-3 py-1.5 rounded-xl transition-all"
+                            >
+                              <X className="w-3.5 h-3.5" /> Decline
+                            </button>
+                          </>
+                        )}
+
+                        {activeConversation.status === 'RESERVED' && (
                           <button
-                            onClick={() => declineInterest(activeConversation.interest.id)}
-                            className="bg-stone-200 hover:bg-rose-100 text-stone-700 hover:text-rose-700 font-semibold text-xs px-3 py-1.5 rounded-xl transition-all"
+                            onClick={() =>
+                              setHandoverModalData({
+                                listingId: activeConversation.listing.id,
+                                interestId: activeConversation.interest.id,
+                              })
+                            }
+                            className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-xs transition-all"
                           >
-                            <X className="w-3.5 h-3.5" /> Decline
+                            <MapPin className="w-3.5 h-3.5" /> Plan Handover
                           </button>
-                        </>
-                      )}
+                        )}
 
-                      {activeConversation.status === 'RESERVED' && (
-                        <button
-                          onClick={() =>
-                            setHandoverModalData({
-                              listingId: activeConversation.listing.id,
-                              interestId: activeConversation.interest.id,
-                            })
-                          }
-                          className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-xs transition-all"
-                        >
-                          <MapPin className="w-3.5 h-3.5" /> Plan Handover
-                        </button>
-                      )}
+                        {isOwnerOfActive && activeConversation.status === 'HANDOVER_PLANNED' && (
+                          <button
+                            onClick={() => completeExchange(activeConversation.listing.id)}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-xs transition-all"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Mark Completed
+                          </button>
+                        )}
 
-                      {isOwnerOfActive && activeConversation.status === 'HANDOVER_PLANNED' && (
-                        <button
-                          onClick={() => completeExchange(activeConversation.listing.id)}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-xs transition-all"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Mark Completed
-                        </button>
-                      )}
-
-                      {activeConversation.status === 'COMPLETED' && (
-                        <button
-                          onClick={() =>
-                            setFeedbackModalData({
-                              exchangeId: activeConversation.listing.id,
-                              toUserId: activeConversation.otherUser.id,
-                              toUserName: activeConversation.otherUser.name,
-                            })
-                          }
-                          className="bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-xs transition-all"
-                        >
-                          <Sparkles className="w-3.5 h-3.5" /> Leave Feedback
-                        </button>
-                      )}
+                        {activeConversation.status === 'COMPLETED' && (
+                          <button
+                            onClick={() =>
+                              setFeedbackModalData({
+                                exchangeId: activeConversation.listing.id,
+                                toUserId: activeConversation.otherUser.id,
+                                toUserName: activeConversation.otherUser.name,
+                              })
+                            }
+                            className="bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-xs transition-all"
+                          >
+                            <Sparkles className="w-3.5 h-3.5" /> Leave Feedback
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* Handover Notice banner if planned */}
                   {activeHandover && activeConversation.status === 'HANDOVER_PLANNED' && (
@@ -670,7 +814,7 @@ function MatchesAndConversationsContent() {
                     <div className="inline-flex items-center gap-1.5 bg-white border border-stone-200 px-3 py-1 rounded-full text-[11px] text-stone-500 shadow-xs">
                       <Clock className="w-3 h-3 text-stone-400" />
                       <span>
-                        Interest initiated on {new Date(activeConversation.interest.created_at).toLocaleDateString([], {
+                        {activeConversation.lookingFor ? 'Offer' : 'Interest'} initiated on {new Date(activeConversation.interest.created_at).toLocaleDateString([], {
                           month: 'short',
                           day: 'numeric',
                           hour: '2-digit',

@@ -8,6 +8,8 @@ import {
 import { dbService, initializeDatabase } from '../lib/db';
 import { listingService } from '../lib/listings';
 import { messageService } from '../lib/messages';
+import { notificationService } from '../lib/notifications';
+import { lookingForService } from '../lib/looking-for';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 
@@ -52,8 +54,9 @@ interface AppContextType {
   markConversationRead: (interestId: string) => Promise<void>;
   getConversationMessages: (interestId: string) => Message[];
 
-  createLookingFor: (data: Omit<LookingFor, 'id' | 'created_at' | 'updated_at' | 'status'>) => LookingFor;
-  updateLookingForStatus: (id: string, status: LookingFor['status']) => void;
+  createLookingFor: (data: Omit<LookingFor, 'id' | 'created_at' | 'updated_at' | 'status'>) => Promise<LookingFor> | LookingFor;
+  updateLookingForStatus: (id: string, status: LookingFor['status']) => Promise<LookingFor | void> | void;
+  offerItem: (request: LookingFor) => Promise<string>;
 
   createKnowledgePost: (data: Omit<KnowledgePost, 'id' | 'created_at' | 'updated_at' | 'status' | 'useful_count'>) => KnowledgePost;
   markKnowledgeUseful: (id: string) => void;
@@ -108,12 +111,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }).catch(console.warn);
 
+    // Asynchronously fetch fresh persistent Looking For requests from Supabase
+    lookingForService.fetchLookingFor().then((fetched) => {
+      if (fetched && fetched.length > 0) {
+        setLookingFor(fetched);
+      }
+    }).catch(console.warn);
+
     if (currentUser) {
       setSavedListings(dbService.getSavedListings(currentUser.id));
       setSavedKnowledge(dbService.getSavedKnowledge(currentUser.id));
       setNotifications(dbService.getNotifications(currentUser.id));
       setMatches(dbService.getMatchesForUser(currentUser.id));
       setUnreadMessageCount(dbService.getUnreadMessageCount(currentUser.id));
+
+      // Asynchronously fetch fresh notifications and messages from Supabase
+      notificationService.fetchNotifications(currentUser.id).then((fetched) => {
+        if (fetched) setNotifications(fetched);
+      }).catch(console.warn);
+
+      messageService.getMessagesForUser(currentUser.id).then((fetched) => {
+        if (fetched) setMessages(fetched);
+      }).catch(console.warn);
     } else {
       setSavedListings([]);
       setSavedKnowledge([]);
@@ -165,7 +184,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             'postgres_changes',
             { event: '*', schema: 'public', table: 'listings' },
             (payload: any) => {
-              console.log('[AppContext] Realtime postgres_changes event:', payload);
               if (payload.eventType === 'INSERT') {
                 listingService.fetchListings().then(setListings).catch(console.warn);
               } else if (payload.eventType === 'UPDATE') {
@@ -174,6 +192,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 );
               } else if (payload.eventType === 'DELETE') {
                 setListings((prev) => prev.filter((l) => l.id !== payload.old.id));
+              }
+            }
+          )
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'looking_for' },
+            () => {
+              lookingForService.fetchLookingFor().then(setLookingFor).catch(console.warn);
+            }
+          )
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'messages' },
+            () => {
+              if (currentUser) {
+                messageService.getMessagesForUser(currentUser.id).then(setMessages).catch(console.warn);
+              }
+            }
+          )
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'notifications' },
+            () => {
+              if (currentUser) {
+                notificationService.fetchNotifications(currentUser.id).then(setNotifications).catch(console.warn);
               }
             }
           )
@@ -312,18 +355,67 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const createLookingFor = (data: Omit<LookingFor, 'id' | 'created_at' | 'updated_at' | 'status'>) => {
-    const req = dbService.createLookingFor(data);
+  const createLookingFor = async (data: Omit<LookingFor, 'id' | 'created_at' | 'updated_at' | 'status'>) => {
+    const req = await lookingForService.createLookingFor(data);
     refreshData();
     showToast('Your request is live on Looking For.', 'success');
     return req;
   };
 
-  const updateLookingForStatus = (id: string, status: LookingFor['status']) => {
-    dbService.updateLookingForStatus(id, status);
+  const updateLookingForStatus = async (id: string, status: LookingFor['status']) => {
+    const updated = await lookingForService.updateLookingForStatus(id, status);
     refreshData();
     showToast(`Request status updated to ${status}.`, 'info');
+    return updated;
   };
+
+  const offerItem = useCallback(async (request: LookingFor): Promise<string> => {
+    if (!currentUser) {
+      showToast('Please log in to offer an item.', 'error');
+      throw new Error('Must be logged in to offer an item');
+    }
+
+    if (currentUser.id === request.student_id) {
+      showToast('You cannot offer an item to your own request.', 'error');
+      throw new Error('Cannot offer to own request');
+    }
+
+    if (request.status !== 'OPEN') {
+      showToast('This Looking For request is no longer open.', 'error');
+      throw new Error('Looking For request is not open');
+    }
+
+    const threadId = `lf_${request.id}_${currentUser.id}`;
+
+    // Check if an offer or conversation already exists for this post from currentUser
+    const existingMessages = dbService.getMessagesByInterest(threadId);
+    if (existingMessages.length > 0) {
+      showToast('Opening your existing conversation...', 'info');
+      return threadId;
+    }
+
+    // 1. Create the initial offer message (skip generic notification since we will dispatch a specialized one)
+    const initialContent = `Hi! I saw your Looking For post for "${request.title}" and I may be able to help.`;
+    await messageService.sendMessage({
+      interest_id: threadId,
+      sender_id: currentUser.id,
+      recipient_id: request.student_id,
+      content: initialContent,
+      skipNotification: true,
+    });
+
+    // 2. Create a dedicated LOOKING_FOR_OFFER notification for the Looking For post owner
+    await notificationService.createNotification({
+      user_id: request.student_id,
+      type: 'LOOKING_FOR_OFFER',
+      message: `${currentUser.name} has offered an item for your request "${request.title}".`,
+      link: `/matches?tab=conversations&conversation=${threadId}`,
+    });
+
+    refreshData();
+    showToast('Offer submitted! Opening chat...', 'success');
+    return threadId;
+  }, [currentUser, refreshData, showToast]);
 
   const createKnowledgePost = (data: Omit<KnowledgePost, 'id' | 'created_at' | 'updated_at' | 'status' | 'useful_count'>) => {
     const post = dbService.createKnowledgePost(data);
@@ -404,13 +496,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const markNotificationRead = (id: string) => {
-    dbService.markNotificationRead(id);
+    notificationService.markAsRead(id);
     refreshData();
   };
 
   const markAllNotificationsRead = () => {
     if (!currentUser) return;
-    dbService.markAllNotificationsRead(currentUser.id);
+    notificationService.markAllAsRead(currentUser.id);
     refreshData();
     showToast('All notifications marked as read.', 'info');
   };
@@ -448,6 +540,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         getConversationMessages,
         createLookingFor,
         updateLookingForStatus,
+        offerItem,
         createKnowledgePost,
         markKnowledgeUseful,
         toggleSaveListing,

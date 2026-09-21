@@ -184,7 +184,17 @@ export interface Report {
 export interface Notification {
   id: string;
   user_id: string;
-  type: 'INTEREST_RECEIVED' | 'INTEREST_ACCEPTED' | 'INTEREST_DECLINED' | 'RESERVED' | 'HANDOVER_PLANNED' | 'EXCHANGE_COMPLETED' | 'NEW_MATCH' | 'KNOWLEDGE_PUBLISHED' | 'NEW_MESSAGE';
+  type:
+    | 'INTEREST_RECEIVED'
+    | 'INTEREST_ACCEPTED'
+    | 'INTEREST_DECLINED'
+    | 'RESERVED'
+    | 'HANDOVER_PLANNED'
+    | 'EXCHANGE_COMPLETED'
+    | 'NEW_MATCH'
+    | 'KNOWLEDGE_PUBLISHED'
+    | 'NEW_MESSAGE'
+    | 'LOOKING_FOR_OFFER';
   message: string;
   link?: string;
   read: boolean;
@@ -208,10 +218,11 @@ export interface Message {
 export interface Conversation {
   interest: Interest;
   listing: Listing;
+  lookingFor?: LookingFor;
   otherUser: User;
   lastMessage?: Message;
   unreadCount: number;
-  status: InterestStatus | ListingStatus;
+  status: InterestStatus | ListingStatus | RequestStatus;
   updated_at: string;
 }
 

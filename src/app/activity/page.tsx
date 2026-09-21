@@ -11,7 +11,7 @@ import { KnowledgeCard } from '../../components/knowledge-card';
 import { MatchCard } from '../../components/match-card';
 import { HandoverModal } from '../../components/handover-modal';
 import { FeedbackModal } from '../../components/feedback-modal';
-import { ActivityCategory, ActivityItem, Interest, Listing, User } from '../../types';
+import { ActivityCategory, ActivityItem, Interest, Listing, User, LookingFor } from '../../types';
 import {
   Package, SearchCode, BookOpen, Sparkles, CheckCircle2,
   MapPin, MessageSquare, Clock, Check, X, ArrowRight,
@@ -260,26 +260,42 @@ function ActivityContent() {
     messages
       .filter((m) => !m.system_event && (m.sender_id === currentUser.id || m.recipient_id === currentUser.id))
       .forEach((msg) => {
-        const interest = interests.find((i) => i.id === msg.interest_id);
-        const listing = listings.find((l) => l.id === msg.listing_id || l.id === interest?.listing_id);
+        const isOffer = msg.interest_id?.startsWith('lf_');
+        let offerReq: LookingFor | undefined;
+        if (isOffer) {
+          const reqId = msg.interest_id.split('_')[1];
+          offerReq = lookingFor.find((r) => r.id === reqId);
+        }
+
+        const interest = !isOffer ? interests.find((i) => i.id === msg.interest_id) : undefined;
+        const listing = !isOffer ? listings.find((l) => l.id === msg.listing_id || l.id === interest?.listing_id) : undefined;
         const isSender = msg.sender_id === currentUser.id;
         const otherUserId = isSender ? msg.recipient_id : msg.sender_id;
         const otherUser = users.find((u) => u.id === otherUserId);
+
+        let title = '';
+        if (isOffer && offerReq) {
+          title = isSender
+            ? `You offered an item for "${offerReq.title}"`
+            : `${otherUser?.name || 'A student'} offered an item for your request "${offerReq.title}"`;
+        } else {
+          title = isSender
+            ? `You replied to ${otherUser?.name || 'student'}`
+            : `${otherUser?.name || 'Student'} sent you a message`;
+        }
 
         items.push({
           id: `act-msg-${msg.id}`,
           type: 'MESSAGE',
           category: 'Messages',
-          title: isSender
-            ? `You replied to ${otherUser?.name || 'student'}`
-            : `${otherUser?.name || 'Student'} sent you a message`,
+          title,
           description: `"${msg.content.slice(0, 80)}${msg.content.length > 80 ? '...' : ''}"`,
           timestamp: msg.created_at,
-          status: 'MESSAGE',
-          statusColor: 'stone',
+          status: isOffer ? 'OFFER' : 'MESSAGE',
+          statusColor: isOffer ? 'blue' : 'stone',
           item: listing,
           otherUser,
-          isOwner: listing?.owner_id === currentUser.id,
+          isOwner: isOffer ? offerReq?.student_id === currentUser.id : listing?.owner_id === currentUser.id,
           interestId: msg.interest_id,
           link: `/matches?conversation=${msg.interest_id}`,
           actionLabel: 'Open Chat',

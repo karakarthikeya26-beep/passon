@@ -49,6 +49,59 @@ export const messageService = {
   },
 
   /**
+   * Fetch all messages involving a user from Supabase and merge with local store
+   */
+  getMessagesForUser: async (userId: string): Promise<Message[]> => {
+    const localMsgs = dbService.getMessages();
+
+    if (!isSupabaseConfigured || !userId) {
+      return localMsgs;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .or(`sender_id.eq.${userId},recipient_id.eq.${userId}`)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.warn('[messageService] Supabase getMessagesForUser error:', error.message);
+        return localMsgs;
+      }
+
+      if (data && Array.isArray(data)) {
+        const existingIds = new Set(localMsgs.map((m) => m.id));
+        let changed = false;
+
+        data.forEach((item: any) => {
+          if (!existingIds.has(item.id)) {
+            dbService.createOrMergeMessage({
+              id: item.id,
+              interest_id: item.interest_id,
+              listing_id: item.listing_id || undefined,
+              sender_id: item.sender_id,
+              recipient_id: item.recipient_id,
+              content: item.content,
+              read: item.read ?? false,
+              created_at: item.created_at || new Date().toISOString(),
+            });
+            changed = true;
+          }
+        });
+
+        if (changed) {
+          return dbService.getMessages();
+        }
+      }
+    } catch (err) {
+      console.warn('[messageService] Error syncing messages with Supabase:', err);
+    }
+
+    return localMsgs;
+  },
+
+  /**
    * Send a new message
    */
   sendMessage: async (params: {
@@ -58,8 +111,9 @@ export const messageService = {
     recipient_id: string;
     content: string;
     system_event?: boolean;
+    skipNotification?: boolean;
   }): Promise<Message> => {
-    const { interest_id, listing_id, sender_id, recipient_id, content, system_event } = params;
+    const { interest_id, listing_id, sender_id, recipient_id, content, system_event, skipNotification } = params;
 
     // 1. Store locally immediately
     const message = dbService.createMessage(
@@ -93,8 +147,8 @@ export const messageService = {
       }
     }
 
-    // 3. Notify recipient if it's not a system event
-    if (!system_event) {
+    // 3. Notify recipient if it's not a system event and notification is not skipped
+    if (!system_event && !skipNotification) {
       const sender = dbService.getUserById(sender_id);
       const listing = listing_id ? dbService.getListingById(listing_id) : undefined;
       const snippet = content.length > 50 ? `${content.slice(0, 50)}...` : content;
